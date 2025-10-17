@@ -1,0 +1,26 @@
+# Build directories
+build/
+cmake-build-*/
+
+# Generated point cloud files
+*.pcd
+test_data/
+
+# Compiled binaries
+point_cloud_generator
+point_cloud_generator.exe
+inspect_pointcloud
+inspect_pointcloud.exe
+
+# IDE files
+.vscode/
+.idea/
+*.user
+*.suo
+*.sln
+*.vcxproj*
+
+# OS files
+.DS_Store
+Thumbs.db
+
