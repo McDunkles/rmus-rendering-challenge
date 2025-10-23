@@ -3,7 +3,8 @@
 #include <iomanip>
 #include <string>
 #include <vector>
-#include "../app/src/main/cpp/PointCloudData.h"
+
+#include "PointCloudData.h"
 
 void printHeader(const FileHeader& header) {
     std::cout << "\n=== Point Cloud File Info ===" << std::endl;

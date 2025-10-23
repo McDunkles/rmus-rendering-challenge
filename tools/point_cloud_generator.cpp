@@ -10,8 +10,7 @@
 
 #define M_PI 3.14159265358979323846
 
-// Shared data structures
-#include "../app/src/main/cpp/PointCloudData.h"
+#include "PointCloudData.h"
 
 // Octree node for spatial organization
 struct OctreeNode {
@@ -169,7 +168,7 @@ void generateHelix(std::vector<Point>& points, int count, std::mt19937& rng) {
     std::uniform_real_distribution<float> radius_dist(8.0f, 15.0f);
     std::uniform_int_distribution<int> color_base_dist(0, 255);
     
-    int num_helixes = 8;
+    int num_helixes = 24;
     int points_per_helix = count / num_helixes;
     
     for (int h = 0; h < num_helixes; ++h) {
@@ -187,11 +186,9 @@ void generateHelix(std::vector<Point>& points, int count, std::mt19937& rng) {
             float t = i * 0.01f;
             float radius = base_radius + 3.0f * std::sin(t * 3.0f);
             
-            // Spread around xz plane with individual centers
             float x = center_x + radius * std::cos(t * 2.0f);
             float z = center_z + radius * std::sin(t * 2.0f);
             
-            // Much shorter height range (-15 to 15)
             float y = t * 0.6f - 15.0f;
             
             // Vary colors along the helix
@@ -243,15 +240,23 @@ int main(int argc, char* argv[]) {
     // Generate points
     std::vector<Point> all_points;
     all_points.reserve(total_points);
+	
+	// Distribute point count
+	int terrain_points = (int)(total_points * 0.5);
+	int helix_points = (int)(total_points * 0.25);
+	int sphere_points = (int)(total_points * 0.25);
+	int leftover_points = total_points - terrain_points - helix_points - sphere_points;
+	terrain_points += leftover_points;
     
     std::cout << "Generating terrain..." << std::endl;
-    generateTerrain(all_points, total_points / 2, rng);
+    generateTerrain(all_points, terrain_points, rng);
     
     std::cout << "Generating spheres..." << std::endl;
-    generateSpheres(all_points, 8, rng); // Spheres contain many points
+	int num_spheres = (int)(sphere_points / 10000); // 10000 points per sphere
+    generateSpheres(all_points, num_spheres, rng);
     
     std::cout << "Generating helix..." << std::endl;
-    generateHelix(all_points, total_points / 2, rng);
+    generateHelix(all_points, helix_points, rng);
     
     //std::cout << "Generating random scatter..." << std::endl;
     //generateRandom(all_points, total_points / 4, rng);
