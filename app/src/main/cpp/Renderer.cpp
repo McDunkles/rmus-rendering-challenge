@@ -10,6 +10,7 @@
 #include "AndroidOut.h"
 #include "glm/glm.hpp"
 #include "glm/ext/matrix_clip_space.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 //! executes glGetString and outputs the result to logcat
 #define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
@@ -42,10 +43,11 @@ layout(location = 1) in vec3 inColor;
 out vec3 fragColor;
 
 uniform mat4 uProjection;
+uniform mat4 modelMat;
 
 void main() {
     fragColor = inColor;
-    gl_Position = uProjection * vec4(inPosition, 1.0);
+    gl_Position = uProjection * modelMat * vec4(inPosition, 1.0);
 }
 )vertex";
 
@@ -276,7 +278,19 @@ void Renderer::initRenderer() {
     // Delete shaders as they're linked into program now
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
-    
+
+
+    // Create model matrix
+    glm::mat4 modelMatrix = {1.0f};
+    auto angle = glm::quarter_pi<float>();
+    modelMatrix = glm::rotate(modelMatrix, angle, {0.0f, 0.0f, 1.0f});
+
+    // Set the projection matrix uniform
+    glUseProgram(shader_program_);
+    GLint modelMatLoc = glGetUniformLocation(shader_program_, "modelMat");
+    glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
+
+
     // Define triangle vertices with positions (x, y, z) and colors (r, g, b)
     float vertices[] = {
         // Position          // Color (RGB)
