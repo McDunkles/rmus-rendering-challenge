@@ -24,7 +24,8 @@ public:
             shaderNeedsNewProjectionMatrix_(true),
             shader_program_(0),
             vao_(0),
-            vbo_(0) {
+            vbo_(0),
+            angle_(0) {
         initRenderer();
     }
 
@@ -61,6 +62,7 @@ private:
     EGLContext context_;
     EGLint width_;
     EGLint height_;
+    GLfloat angle_;
 
     bool shaderNeedsNewProjectionMatrix_;
     

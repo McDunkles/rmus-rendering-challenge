@@ -145,6 +145,17 @@ void Renderer::render() {
 
     // Draw the triangle
     glUseProgram(shader_program_);
+
+    /*
+    // Create model matrix
+    glm::mat4 modelMatrix = {1.0f};
+    angle_ += 0.01f;
+    modelMatrix = glm::rotate(modelMatrix, angle_, {0.0f, 0.0f, 1.0f});
+
+    GLint modelMatLoc = glGetUniformLocation(shader_program_, "modelMat");
+    glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
+    */
+
     glBindVertexArray(vao_);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
@@ -282,8 +293,9 @@ void Renderer::initRenderer() {
 
     // Create model matrix
     glm::mat4 modelMatrix = {1.0f};
-    auto angle = glm::quarter_pi<float>();
-    modelMatrix = glm::rotate(modelMatrix, angle, {0.0f, 0.0f, 1.0f});
+    // angle_ = glm::quarter_pi<float>();
+    angle_ = 0;
+    modelMatrix = glm::rotate(modelMatrix, angle_, {0.0f, 0.0f, 1.0f});
 
     // Set the projection matrix uniform
     glUseProgram(shader_program_);
