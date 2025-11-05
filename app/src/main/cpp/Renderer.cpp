@@ -44,10 +44,11 @@ out vec3 fragColor;
 
 uniform mat4 uProjection;
 uniform mat4 modelMat;
+uniform mat4 viewMat;
 
 void main() {
     fragColor = inColor;
-    gl_Position = uProjection * modelMat * vec4(inPosition, 1.0);
+    gl_Position = uProjection * modelMat * viewMat * vec4(inPosition, 1.0);
 }
 )vertex";
 
@@ -116,6 +117,8 @@ void Renderer::render() {
     // changed.
     updateRenderArea();
 
+    bool mySignal = false;
+
     // When the renderable area changes, the projection matrix has to also be updated. This is true
     // even if you change from the sample orthographic projection matrix as your aspect ratio has
     // likely changed.
@@ -131,6 +134,20 @@ void Renderer::render() {
             kProjectionNearPlane, kProjectionFarPlane
         );
 
+        // glm::mat4 newProjMat(1);
+
+        /*
+        int projLen = newProjMat.length();
+        aout << "newProjMat (Length = " << projLen << ") {\n";
+        for (int i = 0; i < projLen; i++) {
+            for (int j = 0; j<newProjMat[0].length(); j++) {
+                aout << newProjMat[j][i] << ", ";
+            }
+            aout << "\n";
+        }
+        aout << "} (Also GLM_CONFIG_CLIP_CONTROL = " << GLM_CONFIG_CLIP_CONTROL << "\n";
+        */
+
         // Set the projection matrix uniform
         glUseProgram(shader_program_);
         GLint projectionLoc = glGetUniformLocation(shader_program_, "uProjection");
@@ -138,6 +155,7 @@ void Renderer::render() {
 
         // make sure the matrix isn't generated every frame
         shaderNeedsNewProjectionMatrix_ = false;
+        mySignal = true;
     }
 
     // clear the color buffer
@@ -146,15 +164,33 @@ void Renderer::render() {
     // Draw the triangle
     glUseProgram(shader_program_);
 
-    /*
-    // Create model matrix
-    glm::mat4 modelMatrix = {1.0f};
-    angle_ += 0.01f;
-    modelMatrix = glm::rotate(modelMatrix, angle_, {0.0f, 0.0f, 1.0f});
 
-    GLint modelMatLoc = glGetUniformLocation(shader_program_, "modelMat");
-    glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
-    */
+    // Update view matrix
+    glm::mat4 viewMatrix = {1.0f};
+    angle_ += 0.01f;
+    slider_ += 0.001f;
+    // viewMatrix = glm::rotate(viewMatrix, angle_, {0.0f, 0.0f, 1.0f});
+    viewMatrix = glm::translate(viewMatrix, {slider_, 0, 0});
+
+    if (mySignal) {
+
+        int projLen = viewMatrix.length();
+        aout << "viewMatrix (Length = " << projLen << ") {\n";
+        for (int i = 0; i < projLen; i++) {
+            for (int j = 0; j<viewMatrix[0].length(); j++) {
+                aout << viewMatrix[j][i] << ", ";
+            }
+            aout << "\n";
+        }
+        aout << "} (Also GLM_CONFIG_CLIP_CONTROL = " << GLM_CONFIG_CLIP_CONTROL << "\n";
+        mySignal = false;
+    }
+
+    GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
+    glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
+
+
+    // glm::translate()
 
     glBindVertexArray(vao_);
     glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -184,6 +220,8 @@ void Renderer::initRenderer() {
     // figure out how many configs there are
     EGLint numConfigs;
     eglChooseConfig(display, attribs, nullptr, 0, &numConfigs);
+
+    // glm::lookAt()
 
     // get the list of configurations
     std::unique_ptr<EGLConfig[]> supportedConfigs(new EGLConfig[numConfigs]);
@@ -291,7 +329,7 @@ void Renderer::initRenderer() {
     glDeleteShader(fragmentShader);
 
 
-    // Create model matrix
+    // Initialize model matrix
     glm::mat4 modelMatrix = {1.0f};
     // angle_ = glm::quarter_pi<float>();
     angle_ = 0;
@@ -301,6 +339,12 @@ void Renderer::initRenderer() {
     glUseProgram(shader_program_);
     GLint modelMatLoc = glGetUniformLocation(shader_program_, "modelMat");
     glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
+
+
+    // Initialize view matrix
+    glm::mat4 viewMatrix = {1.0f};
+    GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
+    glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
 
 
     // Define triangle vertices with positions (x, y, z) and colors (r, g, b)
@@ -339,6 +383,8 @@ void Renderer::updateRenderArea() {
 
     EGLint height;
     eglQuerySurface(display_, surface_, EGL_HEIGHT, &height);
+
+    // aout << "INFO :: (width, height) = (" << width << ", " << height << ")\n";
 
     if (width != width_ || height != height_) {
         width_ = width;

@@ -25,7 +25,8 @@ public:
             shader_program_(0),
             vao_(0),
             vbo_(0),
-            angle_(0) {
+            angle_(0),
+            slider_(0) {
         initRenderer();
     }
 
@@ -63,6 +64,7 @@ private:
     EGLint width_;
     EGLint height_;
     GLfloat angle_;
+    GLfloat slider_;
 
     bool shaderNeedsNewProjectionMatrix_;
     
