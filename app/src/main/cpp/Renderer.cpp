@@ -12,6 +12,15 @@
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "../../../../tools/PointCloudData.h"
+
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+
+#include <cstring>
+
+using cpoint_t = struct Point;
 
 //! executes glGetString and outputs the result to logcat
 #define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
@@ -76,13 +85,57 @@ static constexpr float kProjectionHalfHeight = 2.f;
  * The near plane distance for the projection matrix. Since this is an orthographic projection
  * matrix, it's convenient to have negative values for sorting (and avoiding z-fighting at 0).
  */
-static constexpr float kProjectionNearPlane = -1.f;
+static constexpr float kProjectionNearPlane = 0.f;
 
 /*!
  * The far plane distance for the projection matrix. Since this is an orthographic porjection
  * matrix, it's convenient to have the far plane equidistant from 0 as the near plane.
  */
-static constexpr float kProjectionFarPlane = 1.f;
+static constexpr float kProjectionFarPlane = 4.f;
+
+void printMatrix(glm::mat4& matrix, const std::string& name) {
+
+    int matLen = glm::mat4::length();
+    aout << "Printing Matrix " << name <<  ": (Length = " << matLen << ") {\n";
+    for (int i = 0; i < matLen; i++) {
+        for (int j = 0; j<matLen; j++) {
+            aout << matrix[j][i] << ", ";
+        }
+        aout << "\n";
+    }
+    aout << "}\n";
+
+}
+
+
+std::string pointAsString(cpoint_t& point) {
+
+    char carr[100];
+    std::sprintf(carr, "Point {Loc(%f, %f, %f), Col(%hhu, %hhu, %hhu)}",
+                 point.x, point.y, point.z, point.r, point.g, point.b);
+
+    return {carr};
+}
+
+
+void printPointData(cpoint_t *buffer, int size, int start, int end) {
+
+    int numElems = end - start;
+
+    if (numElems > size) {
+        aout << "Cannot print " << numElems << " elements from a buffer of size " << size << "...\n";
+        return;
+    }
+
+    aout << "Printing Point Data " <<  ": (Length = " << numElems << ") {\n";
+    for (int i = 0; i < numElems; i++) {
+        std::string pointStr = pointAsString(buffer[start + i]);
+            aout << "buffer[" << i << "] = " << pointStr << "\n";
+    }
+    aout << "}\n";
+
+}
+
 
 Renderer::~Renderer() {
     if (display_ != EGL_NO_DISPLAY) {
@@ -135,19 +188,8 @@ void Renderer::render() {
             kProjectionNearPlane, kProjectionFarPlane
         );
 
-        // glm::mat4 newProjMat(1);
 
-        /*
-        int projLen = newProjMat.length();
-        aout << "newProjMat (Length = " << projLen << ") {\n";
-        for (int i = 0; i < projLen; i++) {
-            for (int j = 0; j<newProjMat[0].length(); j++) {
-                aout << newProjMat[j][i] << ", ";
-            }
-            aout << "\n";
-        }
-        aout << "} (Also GLM_CONFIG_CLIP_CONTROL = " << GLM_CONFIG_CLIP_CONTROL << "\n";
-        */
+        // printMatrix(projectionMatrix, "projectionMatrix");
 
         // Set the projection matrix uniform
         glUseProgram(shader_program_);
@@ -167,24 +209,14 @@ void Renderer::render() {
 
 
     // Update view matrix
-    glm::mat4 viewMatrix = {1.0f};
+    glm::mat4 viewMatrix = this->camera_.viewMatrix_;
     // angle_ += 0.01f;
     // slider_ += 0.001f;
     // viewMatrix = glm::rotate(viewMatrix, angle_, {0.0f, 0.0f, 1.0f});
     viewMatrix = glm::translate(viewMatrix, {slider_, 0, 0});
 
     if (mySignal) {
-
-        int projLen = viewMatrix.length();
-        aout << "viewMatrix (Length = " << projLen << ") {\n";
-        for (int i = 0; i < projLen; i++) {
-            for (int j = 0; j<viewMatrix[0].length(); j++) {
-                aout << viewMatrix[j][i] << ", ";
-            }
-            aout << "\n";
-        }
-        aout << "} (Also GLM_CONFIG_CLIP_CONTROL = " << GLM_CONFIG_CLIP_CONTROL << "\n";
-        mySignal = false;
+        printMatrix(viewMatrix, "viewMatrix1");
     }
 
     GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
@@ -351,17 +383,7 @@ void Renderer::initRenderer() {
 
     glm::mat4 viewMatrix = this->camera_.viewMatrix_;
 
-    /*
-    int projLen = camViewMatrix.length();
-    aout << "camViewMatrix (Length = " << projLen << ") {\n";
-    for (int i = 0; i < projLen; i++) {
-        for (int j = 0; j<camViewMatrix[0].length(); j++) {
-            aout << camViewMatrix[j][i] << ", ";
-        }
-        aout << "\n";
-    }
-    aout << "}\n";
-    */
+    printMatrix(viewMatrix, "viewMatrix");
 
 
     // Initialize view matrix
@@ -370,6 +392,21 @@ void Renderer::initRenderer() {
     glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
 
 
+    // Okay... let's try loading in vertices
+
+    aout << "Attempting to read in point cloud data...\n";
+
+    AAssetManager *assetManager = app_->activity->assetManager;
+    AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_100k.pcd", AASSET_MODE_BUFFER);
+
+    cpoint_t data[1024];
+
+    AAsset_seek(cloudData,96, SEEK_SET);
+    AAsset_read(cloudData,data, 1024);
+
+    printPointData(data, 1024, 0, 10);
+
+    aout << "We should now have point cloud data\n";
 
     // Define triangle vertices with positions (x, y, z) and colors (r, g, b)
     float vertices[] = {
