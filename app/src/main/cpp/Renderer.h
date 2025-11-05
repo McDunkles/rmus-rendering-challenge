@@ -27,8 +27,6 @@ public:
             shader_program_(0),
             vao_(0),
             vbo_(0),
-            angle_(0),
-            slider_(0),
             camera_() {
         initRenderer();
     }
@@ -48,6 +46,15 @@ public:
     void render();
 
 private:
+
+    void initCore();
+
+    void initShaders();
+
+    void initCamera();
+
+    void initData();
+
     /*!
      * Performs necessary OpenGL initialization. Customize this if you want to change your EGL
      * context or application-wide settings.
@@ -66,8 +73,6 @@ private:
     EGLContext context_;
     EGLint width_;
     EGLint height_;
-    GLfloat angle_;
-    GLfloat slider_;
     Camera camera_;
 
     bool shaderNeedsNewProjectionMatrix_;

@@ -76,10 +76,10 @@ void main() {
 )fragment";
 
 /*!
- * Half the height of the projection matrix. This gives you a renderable area of height 4 ranging
- * from -2 to 2
+ * Half the height of the projection matrix. This gives you a renderable area of height 40 ranging
+ * from -20 to 20
  */
-static constexpr float kProjectionHalfHeight = 2.f;
+static constexpr float kProjectionHalfHeight = 20.f;
 
 /*!
  * The near plane distance for the projection matrix. Since this is an orthographic projection
@@ -91,7 +91,7 @@ static constexpr float kProjectionNearPlane = 0.f;
  * The far plane distance for the projection matrix. Since this is an orthographic porjection
  * matrix, it's convenient to have the far plane equidistant from 0 as the near plane.
  */
-static constexpr float kProjectionFarPlane = 4.f;
+static constexpr float kProjectionFarPlane = 25.f;
 
 void printMatrix(glm::mat4& matrix, const std::string& name) {
 
@@ -210,10 +210,7 @@ void Renderer::render() {
 
     // Update view matrix
     glm::mat4 viewMatrix = this->camera_.viewMatrix_;
-    // angle_ += 0.01f;
-    // slider_ += 0.001f;
-    // viewMatrix = glm::rotate(viewMatrix, angle_, {0.0f, 0.0f, 1.0f});
-    viewMatrix = glm::translate(viewMatrix, {slider_, 0, 0});
+    // viewMatrix = glm::translate(viewMatrix, {slider_, 0, 0});
 
     if (mySignal) {
         printMatrix(viewMatrix, "viewMatrix1");
@@ -234,7 +231,7 @@ void Renderer::render() {
     assert(swapResult == EGL_TRUE);
 }
 
-void Renderer::initRenderer() {
+void Renderer::initCore() {
     // Choose your render attributes
     constexpr EGLint attribs[] = {
             EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
@@ -253,8 +250,6 @@ void Renderer::initRenderer() {
     // figure out how many configs there are
     EGLint numConfigs;
     eglChooseConfig(display, attribs, nullptr, 0, &numConfigs);
-
-    // glm::lookAt()
 
     // get the list of configurations
     std::unique_ptr<EGLConfig[]> supportedConfigs(new EGLConfig[numConfigs]);
@@ -299,7 +294,9 @@ void Renderer::initRenderer() {
     display_ = display;
     surface_ = surface;
     context_ = context;
+}
 
+void Renderer::initShaders() {
     // make width and height invalid so it gets updated the first frame in @a updateRenderArea()
     width_ = -1;
     height_ = -1;
@@ -315,12 +312,12 @@ void Renderer::initRenderer() {
     // enable alpha globally for now, you probably don't want to do this in a game
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
+
     // Create and compile vertex shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertex, nullptr);
     glCompileShader(vertexShader);
-    
+
     // Check vertex shader compilation
     GLint success;
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
@@ -329,12 +326,12 @@ void Renderer::initRenderer() {
         glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
         aout << "Vertex shader compilation failed:\n" << infoLog << std::endl;
     }
-    
+
     // Create and compile fragment shader
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragment, nullptr);
     glCompileShader(fragmentShader);
-    
+
     // Check fragment shader compilation
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if (!success) {
@@ -342,13 +339,13 @@ void Renderer::initRenderer() {
         glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
         aout << "Fragment shader compilation failed:\n" << infoLog << std::endl;
     }
-    
+
     // Create shader program and link
     shader_program_ = glCreateProgram();
     glAttachShader(shader_program_, vertexShader);
     glAttachShader(shader_program_, fragmentShader);
     glLinkProgram(shader_program_);
-    
+
     // Check program linking
     glGetProgramiv(shader_program_, GL_LINK_STATUS, &success);
     if (!success) {
@@ -356,44 +353,24 @@ void Renderer::initRenderer() {
         glGetProgramInfoLog(shader_program_, 512, nullptr, infoLog);
         aout << "Shader program linking failed:\n" << infoLog << std::endl;
     }
-    
+
     // Delete shaders as they're linked into program now
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+}
 
 
-    // Initialize model matrix
-    glm::mat4 modelMatrix = {1.0f};
-    // angle_ = glm::quarter_pi<float>();
-    angle_ = 0;
-    modelMatrix = glm::rotate(modelMatrix, angle_, {0.0f, 0.0f, 1.0f});
-
-    // Set the projection matrix uniform
-    glUseProgram(shader_program_);
-    GLint modelMatLoc = glGetUniformLocation(shader_program_, "modelMat");
-    glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
-
-
+void Renderer::initCamera() {
     // Initialize the Camera
     glm::vec3 pos = {0.0f, 0.0f, 3.0f};
     glm::vec3 target = {0.0f, 0.0f, 0.0f};
     glm::vec3 up = {0.0f, 1.0f, 0.0f};
     this->camera_ = Camera(pos, target, up);
     this->camera_.initCamera();
-
-    glm::mat4 viewMatrix = this->camera_.viewMatrix_;
-
-    printMatrix(viewMatrix, "viewMatrix");
+}
 
 
-    // Initialize view matrix
-    // glm::mat4 viewMatrix = {1.0f};
-    GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
-    glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
-
-
-    // Okay... let's try loading in vertices
-
+void Renderer::initData() {
     aout << "Attempting to read in point cloud data...\n";
 
     AAssetManager *assetManager = app_->activity->assetManager;
@@ -410,32 +387,65 @@ void Renderer::initRenderer() {
 
     // Define triangle vertices with positions (x, y, z) and colors (r, g, b)
     float vertices[] = {
-        // Position          // Color (RGB)
-         0.0f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
-        -1.0f, -1.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
-         1.0f, -1.0f, 0.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
+            // Position          // Color (RGB)
+            0.0f,  12.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
+            -7.0f, -10.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
+            8.0f, -15.0f, 0.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
     };
-    
+
     // Create and bind VAO and VBO
     glGenVertexArrays(1, &vao_);
     glGenBuffers(1, &vbo_);
-    
+
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    
+
     // Position attribute (location 0, first 3 floats)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    
+
     // Color attribute (location 1, next 3 floats)
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    
+
     // Unbind VAO
     glBindVertexArray(0);
-    
+
     aout << "Triangle initialized successfully" << std::endl;
+}
+
+
+void Renderer::initRenderer() {
+
+    // 1. Initialize the display, surface, and context objects
+    initCore();
+
+    // 2. Initialize the shaders and attach them to the shader program
+    initShaders();
+
+    // 3. Initialize model matrix
+    glm::mat4 modelMatrix = {1.0f};
+    // modelMatrix = glm::rotate(modelMatrix, angle_, {0.0f, 0.0f, 1.0f});
+
+    // Set the model matrix uniform
+    glUseProgram(shader_program_);
+    GLint modelMatLoc = glGetUniformLocation(shader_program_, "modelMat");
+    glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
+
+    // 4. Initialize our 'Camera', which will contain our view matrix
+    initCamera();
+
+    // 5. Initialize view matrix
+    glm::mat4 viewMatrix = this->camera_.viewMatrix_;
+    printMatrix(viewMatrix, "viewMatrix");
+
+    GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
+    glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
+
+
+    // 6. Okay... let's try loading in vertices
+    initData();
 }
 
 void Renderer::updateRenderArea() {
