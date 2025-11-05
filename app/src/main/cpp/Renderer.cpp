@@ -12,6 +12,7 @@
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
+
 //! executes glGetString and outputs the result to logcat
 #define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
 
@@ -167,8 +168,8 @@ void Renderer::render() {
 
     // Update view matrix
     glm::mat4 viewMatrix = {1.0f};
-    angle_ += 0.01f;
-    slider_ += 0.001f;
+    // angle_ += 0.01f;
+    // slider_ += 0.001f;
     // viewMatrix = glm::rotate(viewMatrix, angle_, {0.0f, 0.0f, 1.0f});
     viewMatrix = glm::translate(viewMatrix, {slider_, 0, 0});
 
@@ -341,10 +342,33 @@ void Renderer::initRenderer() {
     glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
 
 
+    // Initialize the Camera
+    glm::vec3 pos = {0.0f, 0.0f, 3.0f};
+    glm::vec3 target = {0.0f, 0.0f, 0.0f};
+    glm::vec3 up = {0.0f, 1.0f, 0.0f};
+    this->camera_ = Camera(pos, target, up);
+    this->camera_.initCamera();
+
+    glm::mat4 viewMatrix = this->camera_.viewMatrix_;
+
+    /*
+    int projLen = camViewMatrix.length();
+    aout << "camViewMatrix (Length = " << projLen << ") {\n";
+    for (int i = 0; i < projLen; i++) {
+        for (int j = 0; j<camViewMatrix[0].length(); j++) {
+            aout << camViewMatrix[j][i] << ", ";
+        }
+        aout << "\n";
+    }
+    aout << "}\n";
+    */
+
+
     // Initialize view matrix
-    glm::mat4 viewMatrix = {1.0f};
+    // glm::mat4 viewMatrix = {1.0f};
     GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
     glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
+
 
 
     // Define triangle vertices with positions (x, y, z) and colors (r, g, b)

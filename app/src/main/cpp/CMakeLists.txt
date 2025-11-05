@@ -11,6 +11,7 @@ add_library(renderingchallenge SHARED
         main.cpp
         AndroidOut.cpp
         Renderer.cpp
+        Camera.cpp
 )
 
 # Searches for a package provided by the game activity dependency

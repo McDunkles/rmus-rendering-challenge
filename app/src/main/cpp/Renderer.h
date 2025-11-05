@@ -7,6 +7,8 @@
 #include "Model.h"
 #include "Shader.h"
 
+#include "Camera.h"
+
 struct android_app;
 
 class Renderer {
@@ -26,7 +28,8 @@ public:
             vao_(0),
             vbo_(0),
             angle_(0),
-            slider_(0) {
+            slider_(0),
+            camera_() {
         initRenderer();
     }
 
@@ -65,6 +68,7 @@ private:
     EGLint height_;
     GLfloat angle_;
     GLfloat slider_;
+    Camera camera_;
 
     bool shaderNeedsNewProjectionMatrix_;
     
