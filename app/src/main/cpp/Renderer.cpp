@@ -57,7 +57,7 @@ uniform mat4 modelMat;
 uniform mat4 viewMat;
 
 void main() {
-    fragColor = inColor;
+    fragColor = inColor/255.0f;
     gl_Position = uProjection * modelMat * viewMat * vec4(inPosition, 1.0);
 }
 )vertex";
@@ -85,13 +85,13 @@ static constexpr float kProjectionHalfHeight = 20.f;
  * The near plane distance for the projection matrix. Since this is an orthographic projection
  * matrix, it's convenient to have negative values for sorting (and avoiding z-fighting at 0).
  */
-static constexpr float kProjectionNearPlane = 0.f;
+static constexpr float kProjectionNearPlane = -40.f;
 
 /*!
  * The far plane distance for the projection matrix. Since this is an orthographic porjection
  * matrix, it's convenient to have the far plane equidistant from 0 as the near plane.
  */
-static constexpr float kProjectionFarPlane = 25.f;
+static constexpr float kProjectionFarPlane = 20.f;
 
 void printMatrix(glm::mat4& matrix, const std::string& name) {
 
@@ -188,8 +188,10 @@ void Renderer::render() {
             kProjectionNearPlane, kProjectionFarPlane
         );
 
+        glm::perspective()
 
-        // printMatrix(projectionMatrix, "projectionMatrix");
+
+        printMatrix(projectionMatrix, "projectionMatrix");
 
         // Set the projection matrix uniform
         glUseProgram(shader_program_);
@@ -223,13 +225,33 @@ void Renderer::render() {
     // glm::translate()
 
     glBindVertexArray(vao_);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    // glDrawArrays(GL_POINTS, 0, 10);
+    // glDrawArrays(GL_LINES, 0, 10);
+    // glDrawArrays(GL_LINE_LOOP, 0, 10);
+    glDrawArrays(GL_LINE_STRIP, 0, 40);
+    // glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
     assert(swapResult == EGL_TRUE);
 }
+
+// No this isn't safe, quick work-around to render the colour
+void populateDataBuffer(std::vector<cpoint_t>& srcData, float dest[1024][6], int numElems) {
+
+    for (int i = 0; i<numElems; i++) {
+        dest[i][0] = srcData[i].x;
+        dest[i][1] = srcData[i].y;
+        dest[i][2] = srcData[i].z;
+
+        dest[i][3] = ((float)srcData[i].r)/255.0f;
+        dest[i][4] = ((float)srcData[i].g)/255.0f;
+        dest[i][5] = ((float)srcData[i].b)/255.0f;
+    }
+
+}
+
 
 void Renderer::initCore() {
     // Choose your render attributes
@@ -362,8 +384,10 @@ void Renderer::initShaders() {
 
 void Renderer::initCamera() {
     // Initialize the Camera
-    glm::vec3 pos = {0.0f, 0.0f, 3.0f};
-    glm::vec3 target = {0.0f, 0.0f, 0.0f};
+    // glm::vec3 pos = {0.0f, 0.0f, 3.0f};
+    // glm::vec3 target = {0.0f, 0.0f, 0.0f};
+    glm::vec3 pos = {-40.0f, 0.0f, -40.0f};
+    glm::vec3 target = {-40.0f, 0.0f, -50.0f};
     glm::vec3 up = {0.0f, 1.0f, 0.0f};
     this->camera_ = Camera(pos, target, up);
     this->camera_.initCamera();
@@ -376,21 +400,49 @@ void Renderer::initData() {
     AAssetManager *assetManager = app_->activity->assetManager;
     AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_100k.pcd", AASSET_MODE_BUFFER);
 
-    cpoint_t data[1024];
+    // cpoint_t pc_data[1024];
+    std::vector<cpoint_t> pc_data(1024);
+    float pc_data_ext[1024][6];
 
     AAsset_seek(cloudData,96, SEEK_SET);
-    AAsset_read(cloudData,data, 1024);
+    AAsset_read(cloudData,pc_data.data(), 42*sizeof(cpoint_t));
 
-    printPointData(data, 1024, 0, 10);
+    // printPointData(pc_data.data(), 1024, 0, 5);
+
+    for (int i = 0; i<20; i++) {
+        pc_data[i].r = 255;
+        pc_data[i].g = 0;
+        pc_data[i].b = 0;
+    }
+
+
+
+    //float (*)[6]
+    populateDataBuffer(pc_data, pc_data_ext, 1024);
 
     aout << "We should now have point cloud data\n";
 
     // Define triangle vertices with positions (x, y, z) and colors (r, g, b)
+    /*
     float vertices[] = {
             // Position          // Color (RGB)
-            0.0f,  12.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
-            -7.0f, -10.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
-            8.0f, -15.0f, 0.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
+            0.0f,  12.0f, -22.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
+            -7.0f, -10.0f, -22.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
+            8.0f, -15.0f, -22.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
+    };
+    */
+
+    float vertices[] = {
+            // Position          // Color (RGB)
+            -50.0f,  12.0f, -42.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
+            -57.0f, -10.0f, -42.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
+            -42.0f, -15.0f, -42.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
+    };
+
+    cpoint_t vertices2[] = {
+            {.x = -45.0f, .y = 12.0f, .z = -42.0f, .r = (uint8_t)255, .g = (uint8_t)0, .b = (uint8_t)0, .padding = 0},
+            {.x = -52.0f, .y = -10.0f, .z = -42.0f, .r = (uint8_t)0, .g = (uint8_t)255, .b = (uint8_t)0, .padding = 0},
+            {.x = -37.0f, .y = -15.0f, .z = -42.0f, .r = (uint8_t)0, .g = (uint8_t)0, .b = (uint8_t)255, .padding = 0}
     };
 
     // Create and bind VAO and VBO
@@ -399,14 +451,37 @@ void Renderer::initData() {
 
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Position attribute (location 0, first 3 floats)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+
+    // 1. Set data to render
+    // 2. Position attribute (location 0, first 3 floats)
+    // 3. Color attribute (location 1, next 3 floats)
+
+    // For vertices
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    aout << "sizeof(cpoint_t) = " << (sizeof(cpoint_t)) << "\n";
+    aout << "pc_data capacity = " << pc_data.capacity() << "\n";
+
+    // For pc_data
+    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
+    glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(cpoint_t), (void*)(3 * sizeof(float)));
+
+
+    // For vertices2
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
+    // glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(cpoint_t), (void*)(3 * sizeof(float)));
+
+    // For pc_data_ext
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(pc_data_ext), pc_data_ext, GL_STATIC_DRAW);
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
+    // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)(3 * sizeof(float)));
+
     glEnableVertexAttribArray(0);
-
-    // Color attribute (location 1, next 3 floats)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
     // Unbind VAO
@@ -438,7 +513,7 @@ void Renderer::initRenderer() {
 
     // 5. Initialize view matrix
     glm::mat4 viewMatrix = this->camera_.viewMatrix_;
-    printMatrix(viewMatrix, "viewMatrix");
+    // printMatrix(viewMatrix, "viewMatrix");
 
     GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
     glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
