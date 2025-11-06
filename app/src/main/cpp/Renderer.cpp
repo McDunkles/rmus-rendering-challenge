@@ -85,13 +85,13 @@ static constexpr float kProjectionHalfHeight = 20.f;
  * The near plane distance for the projection matrix. Since this is an orthographic projection
  * matrix, it's convenient to have negative values for sorting (and avoiding z-fighting at 0).
  */
-static constexpr float kProjectionNearPlane = -40.f;
+static constexpr float kProjectionNearPlane = 0.5f;
 
 /*!
  * The far plane distance for the projection matrix. Since this is an orthographic porjection
  * matrix, it's convenient to have the far plane equidistant from 0 as the near plane.
  */
-static constexpr float kProjectionFarPlane = 20.f;
+static constexpr float kProjectionFarPlane = 100.f;
 
 void printMatrix(glm::mat4& matrix, const std::string& name) {
 
@@ -182,16 +182,25 @@ void Renderer::render() {
         float halfHeight = kProjectionHalfHeight;
         float halfWidth = halfHeight * aspectRatio;
         
-        glm::mat4 projectionMatrix = glm::ortho(
+        glm::mat4 projectionMatrixOrtho = glm::ortho(
             -halfWidth, halfWidth,
             -halfHeight, halfHeight,
             kProjectionNearPlane, kProjectionFarPlane
         );
 
-        glm::perspective()
+
+        float fovy = glm::pi<float>()/4.0f;
+        glm::mat4 perspectiveMat = glm::perspective
+                (fovy, aspectRatio,
+                 kProjectionNearPlane, kProjectionFarPlane);
 
 
-        printMatrix(projectionMatrix, "projectionMatrix");
+        printMatrix(projectionMatrixOrtho, "projectionMatrixOrtho");
+
+        printMatrix(perspectiveMat, "PERSPECTIVE MATRIX");
+
+        glm::mat4 projectionMatrix = perspectiveMat;
+        // glm::mat4 projectionMatrix = projectionMatrixOrtho;
 
         // Set the projection matrix uniform
         glUseProgram(shader_program_);
@@ -229,7 +238,7 @@ void Renderer::render() {
     // glDrawArrays(GL_LINES, 0, 10);
     // glDrawArrays(GL_LINE_LOOP, 0, 10);
     glDrawArrays(GL_LINE_STRIP, 0, 40);
-    // glDrawArrays(GL_TRIANGLES, 0, 3);
+    // glDrawArrays(GL_TRIANGLES, 0, 9);
     glBindVertexArray(0);
 
     // Present the rendered image. This is an implicit glFlush.
@@ -386,7 +395,7 @@ void Renderer::initCamera() {
     // Initialize the Camera
     // glm::vec3 pos = {0.0f, 0.0f, 3.0f};
     // glm::vec3 target = {0.0f, 0.0f, 0.0f};
-    glm::vec3 pos = {-40.0f, 0.0f, -40.0f};
+    glm::vec3 pos = {-40.0f, 0.0f, -10.0f};
     glm::vec3 target = {-40.0f, 0.0f, -50.0f};
     glm::vec3 up = {0.0f, 1.0f, 0.0f};
     this->camera_ = Camera(pos, target, up);
@@ -423,21 +432,33 @@ void Renderer::initData() {
     aout << "We should now have point cloud data\n";
 
     // Define triangle vertices with positions (x, y, z) and colors (r, g, b)
-    /*
-    float vertices[] = {
-            // Position          // Color (RGB)
-            0.0f,  12.0f, -22.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
-            -7.0f, -10.0f, -22.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
-            8.0f, -15.0f, -22.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
-    };
-    */
 
     float vertices[] = {
             // Position          // Color (RGB)
-            -50.0f,  12.0f, -42.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
-            -57.0f, -10.0f, -42.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
-            -42.0f, -15.0f, -42.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
+            0.0f,  12.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
+            -7.0f, -10.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
+            8.0f, -15.0f, 0.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
     };
+
+
+
+    float vertices3[] = {
+            // Triangle 1   (Center)                    // Color (RGB)
+            0.0f,  1.5f, 10.0f,  1.0f, 0.0f, 0.0f,
+            -5.5f, -1.0f, 10.0f,  0.0f, 1.0f, 0.0f,
+            5.5f, -1.0f, 10.0f,  0.0f, 0.0f, 1.0f,
+
+            // Triangle 2    (Upper Left)                   // Color (RGB)
+            -5.0f,  12.4f, 0.0f,  1.0f, 0.0f, 0.0f,
+            -7.0f, 8.0f, 0.0f,  0.0f, 1.0f, 0.0f,
+            -2.0f, 7.6f, 0.0f,  0.0f, 0.0f, 1.0f,
+
+            // Triangle 3   (Lower Right)                    // Color (RGB)
+            7.0f,  -17.1f, -10.0f,  1.0f, 0.0f, 0.0f,
+            5.0f, -20.0f, -10.0f,  0.0f, 1.0f, 0.0f,
+            9.0f, -21.0f, -10.0f,  0.0f, 0.0f, 1.0f,
+    };
+
 
     cpoint_t vertices2[] = {
             {.x = -45.0f, .y = 12.0f, .z = -42.0f, .r = (uint8_t)255, .g = (uint8_t)0, .b = (uint8_t)0, .padding = 0},
@@ -458,7 +479,7 @@ void Renderer::initData() {
     // 3. Color attribute (location 1, next 3 floats)
 
     // For vertices
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices3), vertices3, GL_STATIC_DRAW);
     // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 
