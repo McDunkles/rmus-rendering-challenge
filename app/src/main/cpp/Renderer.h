@@ -9,6 +9,8 @@
 
 #include "Camera.h"
 
+#include "InputEventState.h"
+
 struct android_app;
 
 class Renderer {
@@ -28,7 +30,8 @@ public:
             shader_program_(0),
             vao_(0),
             vbo_(0),
-            camera_() {
+            camera_(),
+            inState() {
         initRenderer();
     }
 
@@ -76,8 +79,10 @@ private:
     EGLint height_;
     Camera camera_;
 
+
     bool shaderNeedsNewProjectionMatrix_;
     bool updateViewMatrix_;
+    InputEventState inState;
     
     // Example: Simple triangle rendering
     GLuint shader_program_;

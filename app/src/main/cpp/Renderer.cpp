@@ -79,7 +79,7 @@ void main() {
  * Half the height of the projection matrix. This gives you a renderable area of height 40 ranging
  * from -20 to 20
  */
-static constexpr float kProjectionHalfHeight = 20.f;
+// static constexpr float kProjectionHalfHeight = 20.f;
 
 /*!
  * The near plane distance for the projection matrix. Since this is an orthographic projection
@@ -177,25 +177,31 @@ void Renderer::render() {
     // even if you change from the sample orthographic projection matrix as your aspect ratio has
     // likely changed.
     if (shaderNeedsNewProjectionMatrix_) {
+
         // Create a simple orthographic projection matrix
         float aspectRatio = float(width_) / float(height_);
+        camera_.aspectRatio = aspectRatio;
+
+        /*
         float halfHeight = kProjectionHalfHeight;
         float halfWidth = halfHeight * aspectRatio;
-        
+
         glm::mat4 projectionMatrixOrtho = glm::ortho(
             -halfWidth, halfWidth,
             -halfHeight, halfHeight,
             kProjectionNearPlane, kProjectionFarPlane
         );
+        */
 
-
-        float fovy = glm::pi<float>()/3.0f;
+        camera_.fovy = glm::pi<float>()/3.0f;
+        camera_.calcDistScalar();
         glm::mat4 perspectiveMat = glm::perspective
-                (fovy, aspectRatio,
-                 kProjectionNearPlane, kProjectionFarPlane);
+                (camera_.fovy, aspectRatio,
+                 camera_.zNear, camera_.zFar);
 
+        aout << "Camera distScalar = " << camera_.distScalarY << "\n";
 
-        printMatrix(projectionMatrixOrtho, "projectionMatrixOrtho");
+        // printMatrix(projectionMatrixOrtho, "projectionMatrixOrtho");
 
         printMatrix(perspectiveMat, "PERSPECTIVE MATRIX");
 
@@ -214,9 +220,9 @@ void Renderer::render() {
 
     if (updateViewMatrix_) {
 
-        aout << "Updating view matrix!\n";
+        // aout << "Updating view matrix!\n";
 
-        // Initialize view matrix
+        // Update view matrix
         this->camera_.updateViewMatrix();
         glm::mat4 viewMatrix = this->camera_.viewMatrix_;
         // printMatrix(viewMatrix, "viewMatrix");
@@ -235,7 +241,7 @@ void Renderer::render() {
     // Draw the triangle
     glUseProgram(shader_program_);
 
-
+/*
     // Update view matrix
     glm::mat4 viewMatrix = this->camera_.viewMatrix_;
     // viewMatrix = glm::translate(viewMatrix, {slider_, 0, 0});
@@ -246,9 +252,7 @@ void Renderer::render() {
 
     GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
     glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
-
-
-    // glm::translate()
+*/
 
     glBindVertexArray(vao_);
     // glDrawArrays(GL_POINTS, 0, 10);
@@ -412,11 +416,10 @@ void Renderer::initCamera() {
     // Initialize the Camera
     // glm::vec3 pos = {0.0f, 0.0f, 3.0f};
     // glm::vec3 target = {0.0f, 0.0f, 0.0f};
-    glm::vec3 pos = {-40.0f, 10.0f, -20.0f};
-    glm::vec3 target = {-40.0f, 0.0f, -45.0f};
+    glm::vec3 pos = {-5.0f, -20.0f, 0.f};
+    glm::vec3 target = {-5.0f, -30.0f, -25.0f};
     glm::vec3 up = {0.0f, 1.0f, 0.0f};
     this->camera_ = Camera(pos, target, up);
-    this->camera_.initCamera();
 }
 
 
@@ -424,11 +427,40 @@ void Renderer::initData() {
     aout << "Attempting to read in point cloud data...\n";
 
     AAssetManager *assetManager = app_->activity->assetManager;
-    AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_100k.pcd", AASSET_MODE_BUFFER);
+    AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_1m.pcd", AASSET_MODE_BUFFER);
+
+
+    FileHeader header;
+
+    AAsset_read(cloudData,&header, sizeof(FileHeader));
+
+    int chunk_count = header.chunk_count;
+    aout << "Initializing dataset... there are [" << chunk_count << "] chunks in the data\n";
+
+    std::vector<ChunkMetadata> chunkData(chunk_count);
+    AAsset_read(cloudData,chunkData.data(), sizeof(ChunkMetadata) * chunk_count);
+
+    aout << "Chunk metadata read in... ready to start loading in point cloud data!\n";
+
+    for (int i = 0; i<chunk_count; i++) {
+        int max_x = chunkData[i].bbox.max_x;
+        int max_y = chunkData[i].bbox.max_y;
+        int max_z = chunkData[i].bbox.max_z;
+
+        int min_x = chunkData[i].bbox.min_x;
+        int min_y = chunkData[i].bbox.min_y;
+        int min_z = chunkData[i].bbox.min_z;
+
+        aout << "[" << i << "] Bounds:\n";
+        aout << "x: (" << max_x << ", " << min_x << ")\n";
+        aout << "y: (" << max_y << ", " << min_y << ")\n";
+        aout << "z: (" << max_z << ", " << min_z << ")\n";
+    }
+
 
     std::vector<cpoint_t> pc_data(5000);
 
-    AAsset_seek(cloudData,96, SEEK_SET);
+    // AAsset_seek(cloudData,96, SEEK_SET);
     AAsset_read(cloudData,pc_data.data(), 5000*sizeof(cpoint_t));
 
     // printPointData(pc_data.data(), 1024, 0, 5);
@@ -489,6 +521,8 @@ void Renderer::initData() {
 
 
 void Renderer::initRenderer() {
+
+    aout << "Test... AKey_Event_D = " << AKeyEvent('D') << "\n";
 
     // 1. Initialize the display, surface, and context objects
     initCore();
@@ -560,6 +594,8 @@ void Renderer::handleInput() {
             case AMOTION_EVENT_ACTION_POINTER_DOWN:
                 aout << "(" << pointer.id << ", " << x << ", " << y << ") "
                      << "Pointer Down";
+
+                inState.pPos = {x, y};
                 break;
 
             case AMOTION_EVENT_ACTION_CANCEL:
@@ -585,6 +621,33 @@ void Renderer::handleInput() {
                     if (index != (motionEvent.pointerCount - 1)) aout << ",";
                     aout << " ";
                 }
+
+
+                if (inState.toggleFlag) {
+                    // Update camera position
+                    float dx = x - inState.pPos[0];
+                    float dy = y - inState.pPos[1];
+
+                    float viewY = camera_.distScalarY * camera_.targetDist;
+                    float viewX = viewY * camera_.aspectRatio;
+
+                    // aout << "[RENDERER] (viewX, viewY) = (" << viewX << ", " << viewY << ")\n";
+                    // aout << "[RENDERER] (dx, dy) = (" << dx << ", " << dy << ")\n";
+
+                    float diffX = (dx/width_);
+                    float diffY = (dy/width_);
+
+                    glm::vec2 tiltVector = {diffX, diffY};
+
+                    // aout << "[RENDERER] (diffX, diffY) = (" << diffX << ", " << diffY << ")\n";
+
+                    // Do the thing
+                    camera_.camTilt(tiltVector);
+                    updateViewMatrix_ = true;
+                }
+
+                inState.pPos = {x, y};
+
                 aout << "Pointer Move";
                 break;
             default:
@@ -607,35 +670,45 @@ void Renderer::handleInput() {
                 aout << "Key Up";
 
                 switch (keyEvent.keyCode) {
-                    case 34: // 'f' key (x++)
+                    case AKeyEvent('F'): // 'f' key (x++)
                         camera_.pos_[0]++;
                         aout << "camera.x = " << camera_.pos_[0];
                         updateViewMatrix_ = true;
                         break;
-                    case 47: // 's' key (x--)
+                    case AKeyEvent('S'): // 's' key (x--)
                         camera_.pos_[0]--;
                         aout << "camera.x = " << camera_.pos_[0];
                         updateViewMatrix_ = true;
                         break;
-                    case 33: // 'e' key (y++)
+                    case AKeyEvent('E'): // 'e' key (y++)
                         camera_.pos_[1]++;
                         aout << "camera.y = " << camera_.pos_[1];
                         updateViewMatrix_ = true;
                         break;
-                    case 32: // 'd' key (y--)
+                    case AKeyEvent('D'): // 'd' key (y--)
                         camera_.pos_[1]--;
                         aout << "camera.y = " << camera_.pos_[1];
                         updateViewMatrix_ = true;
                         break;
-                    case 51: // 'w' key (z++)
+                    case AKeyEvent('W'): // 'w' key (z++)
                         camera_.pos_[2]++;
                         aout << "camera.z = " << camera_.pos_[2];
                         updateViewMatrix_ = true;
                         break;
-                    case 45: // 'q' key (z--)
+                    case AKeyEvent('Q'): // 'q' key (z--)
                         camera_.pos_[2]--;
-                        aout << "camera.z = " << camera_.pos_[2];
+                        aout << "camera.z = " << camera_.pos_[2] << "\n";
                         updateViewMatrix_ = true;
+                        break;
+                    case AKeyEvent('T'):
+                        inState.toggleFlag = !inState.toggleFlag;
+                        aout << "Toggling Cam Tilt Flag " <<
+                        ((inState.toggleFlag)? "ON" : "OFF" ) << "\n";
+                        break;
+                    case AKeyEvent('P'):
+                        inState.panFlag = !inState.panFlag;
+                        aout << "Toggling Camera Pan Flag " <<
+                        ((inState.panFlag)? "ON" : "OFF" ) << "\n";
                         break;
 
                 }
