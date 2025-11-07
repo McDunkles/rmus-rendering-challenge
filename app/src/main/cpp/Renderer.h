@@ -9,7 +9,8 @@
 
 #include "Camera.h"
 
-#include "InputEventState.h"
+#include "RendererState.h"
+#include "../../../../tools/PointCloudData.h"
 
 struct android_app;
 
@@ -71,6 +72,10 @@ private:
      */
     void updateRenderArea();
 
+
+    void setRenderBoxes();
+
+
     android_app *app_;
     EGLDisplay display_;
     EGLSurface surface_;
@@ -83,11 +88,15 @@ private:
     bool shaderNeedsNewProjectionMatrix_;
     bool updateViewMatrix_;
     InputEventState inState;
+    RendStateVars stateVars;
     
     // Example: Simple triangle rendering
     GLuint shader_program_;
     GLuint vao_;
     GLuint vbo_;
+
+    BoundingBox absoluteBounds;
+    std::vector<glm::vec4> renderBoxes;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H

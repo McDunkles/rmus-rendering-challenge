@@ -13,6 +13,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "../../../../tools/PointCloudData.h"
+#include "Octree.h"
 
 #include <iostream>
 #include <fstream>
@@ -76,22 +77,16 @@ void main() {
 )fragment";
 
 /*!
- * Half the height of the projection matrix. This gives you a renderable area of height 40 ranging
- * from -20 to 20
- */
-// static constexpr float kProjectionHalfHeight = 20.f;
-
-/*!
  * The near plane distance for the projection matrix. Since this is an orthographic projection
  * matrix, it's convenient to have negative values for sorting (and avoiding z-fighting at 0).
  */
-static constexpr float kProjectionNearPlane = 0.5f;
+// static constexpr float kProjectionNearPlane = 0.5f;
 
 /*!
  * The far plane distance for the projection matrix. Since this is an orthographic porjection
  * matrix, it's convenient to have the far plane equidistant from 0 as the near plane.
  */
-static constexpr float kProjectionFarPlane = 50.f;
+// static constexpr float kProjectionFarPlane = 30.f;
 
 void printMatrix(glm::mat4& matrix, const std::string& name) {
 
@@ -165,6 +160,32 @@ Renderer::~Renderer() {
     }
 }
 
+
+// Aspect ratio must be known first
+void Renderer::setRenderBoxes() {
+
+    // Let's start with four boxes
+
+    float renderDepth = camera_.zFar - camera_.zNear;
+
+    std::vector<float> depths = {
+            camera_.zNear,
+            camera_.zNear + (renderDepth/3.f),
+            camera_.zNear + (2.f*renderDepth/3.f),
+            camera_.zFar
+    };
+
+    for (int i = 0; i<depths.size(); i++) {
+        float vert = (camera_.distScalarY) * depths[i];
+        float horiz = vert*camera_.aspectRatio;
+        // renderBoxes[i]
+    }
+
+    // renderBoxes[0]
+
+}
+
+
 void Renderer::render() {
     // Check to see if the surface has changed size. This is _necessary_ to do every frame when
     // using immersive mode as you'll get no other notification that your renderable area has
@@ -182,31 +203,18 @@ void Renderer::render() {
         float aspectRatio = float(width_) / float(height_);
         camera_.aspectRatio = aspectRatio;
 
-        /*
-        float halfHeight = kProjectionHalfHeight;
-        float halfWidth = halfHeight * aspectRatio;
 
-        glm::mat4 projectionMatrixOrtho = glm::ortho(
-            -halfWidth, halfWidth,
-            -halfHeight, halfHeight,
-            kProjectionNearPlane, kProjectionFarPlane
-        );
-        */
-
-        camera_.fovy = glm::pi<float>()/3.0f;
         camera_.calcDistScalar();
+
+
         glm::mat4 perspectiveMat = glm::perspective
                 (camera_.fovy, aspectRatio,
                  camera_.zNear, camera_.zFar);
 
         aout << "Camera distScalar = " << camera_.distScalarY << "\n";
-
-        // printMatrix(projectionMatrixOrtho, "projectionMatrixOrtho");
-
         printMatrix(perspectiveMat, "PERSPECTIVE MATRIX");
 
         glm::mat4 projectionMatrix = perspectiveMat;
-        // glm::mat4 projectionMatrix = projectionMatrixOrtho;
 
         // Set the projection matrix uniform
         glUseProgram(shader_program_);
@@ -346,6 +354,15 @@ void Renderer::initCore() {
     display_ = display;
     surface_ = surface;
     context_ = context;
+
+
+    EGLint width;
+    eglQuerySurface(display_, surface_, EGL_WIDTH, &width);
+
+    EGLint height;
+    eglQuerySurface(display_, surface_, EGL_HEIGHT, &height);
+
+    aout << "CORE INIT: (width, height) = (" << width << ", " << height << ")\n";
 }
 
 void Renderer::initShaders() {
@@ -419,20 +436,32 @@ void Renderer::initCamera() {
     glm::vec3 pos = {-5.0f, -20.0f, 0.f};
     glm::vec3 target = {-5.0f, -30.0f, -25.0f};
     glm::vec3 up = {0.0f, 1.0f, 0.0f};
-    this->camera_ = Camera(pos, target, up);
+    this->camera_ = Camera(pos, up);
+
+    if (stateVars.hasAspectRatio) {
+        camera_.calcDistScalar();
+    }
 }
+
+typedef struct ChunkMetaMetaData {
+
+
+
+} CMMD_t;
 
 
 void Renderer::initData() {
     aout << "Attempting to read in point cloud data...\n";
 
     AAssetManager *assetManager = app_->activity->assetManager;
-    AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_1m.pcd", AASSET_MODE_BUFFER);
+    AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_1m.pcd", AASSET_MODE_RANDOM);
 
 
     FileHeader header;
 
     AAsset_read(cloudData,&header, sizeof(FileHeader));
+
+    absoluteBounds = header.bounds;
 
     int chunk_count = header.chunk_count;
     aout << "Initializing dataset... there are [" << chunk_count << "] chunks in the data\n";
@@ -442,21 +471,16 @@ void Renderer::initData() {
 
     aout << "Chunk metadata read in... ready to start loading in point cloud data!\n";
 
+    OctreeNode root(absoluteBounds, 0, 0);
+
     for (int i = 0; i<chunk_count; i++) {
-        int max_x = chunkData[i].bbox.max_x;
-        int max_y = chunkData[i].bbox.max_y;
-        int max_z = chunkData[i].bbox.max_z;
-
-        int min_x = chunkData[i].bbox.min_x;
-        int min_y = chunkData[i].bbox.min_y;
-        int min_z = chunkData[i].bbox.min_z;
-
-        aout << "[" << i << "] Bounds:\n";
-        aout << "x: (" << max_x << ", " << min_x << ")\n";
-        aout << "y: (" << max_y << ", " << min_y << ")\n";
-        aout << "z: (" << max_z << ", " << min_z << ")\n";
+        root.insert(chunkData[i].bbox);
     }
 
+    // OctreeNode desiredNode = root.getNode(targetPoint)
+
+    // Finds which index the desired node should be at in memory
+    // root.getSequentialLoc(desiredNode)
 
     std::vector<cpoint_t> pc_data(5000);
 

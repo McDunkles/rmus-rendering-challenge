@@ -17,7 +17,7 @@ class Camera {
 public:
 
     static constexpr float zNear = 0.5f;
-    static constexpr float zFar = 50.f;
+    static constexpr float zFar = 40.f;
 
     glm::vec3 pos_;
     glm::vec3 target_;
@@ -32,11 +32,21 @@ public:
     int tiltCount;
     int tiltThreshold;
 
-    explicit inline Camera() : pos_(glm::vec3(0.0f)),
-    target_(glm::vec3(0.0f)), up_(glm::vec3(0.0f)),
-    viewMatrix_(glm::mat4(0.0f)) {
+    explicit inline Camera() : Camera(
+            {0, 0, 0},
+            {0, 0, 1},
+            {0, 1, 0}) {}
 
+    explicit inline Camera(glm::vec3 pos) :
+            Camera(pos, {0, 0, 1},
+                   {0, 1, 0}) {}
+
+    explicit inline Camera(glm::vec3 pos, glm::vec3 up)
+            : pos_(pos), up_(up) {
+        target_ = {pos.x, pos.y, pos.z - (zFar - zNear)/2};
+        initCamera();
     }
+
 
     explicit inline Camera(glm::vec3 pos, glm::vec3 target, glm::vec3 up)
     : pos_(pos), target_(target), up_(up), viewMatrix_(glm::mat4(0.0f)) {

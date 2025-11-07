@@ -21,6 +21,8 @@ void Camera::initCamera() {
     tiltCount = 0;
     tiltThreshold = 3;
 
+    fovy = glm::pi<float>()/3.0f;
+
     aout << "Camera created! Target Distance = " << targetDist;
 }
 

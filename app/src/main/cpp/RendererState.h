@@ -2,8 +2,8 @@
 // Created by dunca on 2025-11-06.
 //
 
-#ifndef RENDERINGCHALLENGE_INPUTEVENTSTATE_H
-#define RENDERINGCHALLENGE_INPUTEVENTSTATE_H
+#ifndef RENDERINGCHALLENGE_RENDERERSTATE_H
+#define RENDERINGCHALLENGE_RENDERERSTATE_H
 
 #include "glm/glm.hpp"
 
@@ -24,4 +24,9 @@ typedef struct InputEventState {
 } InputEventState;
 
 
-#endif //RENDERINGCHALLENGE_INPUTEVENTSTATE_H
+struct RendStateVars {
+    bool hasAspectRatio;
+};
+
+
+#endif //RENDERINGCHALLENGE_RENDERERSTATE_H
