@@ -16,3 +16,10 @@ void Camera::initCamera() {
     viewMatrix_ = viewMatrix;
 }
 
+void Camera::updateViewMatrix() {
+    // Create the view matrix
+    glm::mat4 viewMatrix = glm::lookAt(pos_, target_, up_);
+
+    viewMatrix_ = viewMatrix;
+}
+

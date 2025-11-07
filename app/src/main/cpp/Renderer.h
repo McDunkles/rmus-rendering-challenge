@@ -24,6 +24,7 @@ public:
             width_(0),
             height_(0),
             shaderNeedsNewProjectionMatrix_(true),
+            updateViewMatrix_(true),
             shader_program_(0),
             vao_(0),
             vbo_(0),
@@ -76,6 +77,7 @@ private:
     Camera camera_;
 
     bool shaderNeedsNewProjectionMatrix_;
+    bool updateViewMatrix_;
     
     // Example: Simple triangle rendering
     GLuint shader_program_;

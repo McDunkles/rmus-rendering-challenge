@@ -91,7 +91,7 @@ static constexpr float kProjectionNearPlane = 0.5f;
  * The far plane distance for the projection matrix. Since this is an orthographic porjection
  * matrix, it's convenient to have the far plane equidistant from 0 as the near plane.
  */
-static constexpr float kProjectionFarPlane = 100.f;
+static constexpr float kProjectionFarPlane = 50.f;
 
 void printMatrix(glm::mat4& matrix, const std::string& name) {
 
@@ -189,7 +189,7 @@ void Renderer::render() {
         );
 
 
-        float fovy = glm::pi<float>()/4.0f;
+        float fovy = glm::pi<float>()/3.0f;
         glm::mat4 perspectiveMat = glm::perspective
                 (fovy, aspectRatio,
                  kProjectionNearPlane, kProjectionFarPlane);
@@ -210,6 +210,23 @@ void Renderer::render() {
         // make sure the matrix isn't generated every frame
         shaderNeedsNewProjectionMatrix_ = false;
         mySignal = true;
+    }
+
+    if (updateViewMatrix_) {
+
+        aout << "Updating view matrix!\n";
+
+        // Initialize view matrix
+        this->camera_.updateViewMatrix();
+        glm::mat4 viewMatrix = this->camera_.viewMatrix_;
+        // printMatrix(viewMatrix, "viewMatrix");
+
+        glUseProgram(shader_program_);
+        GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
+        glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
+
+
+        updateViewMatrix_ = false;
     }
 
     // clear the color buffer
@@ -237,7 +254,7 @@ void Renderer::render() {
     // glDrawArrays(GL_POINTS, 0, 10);
     // glDrawArrays(GL_LINES, 0, 10);
     // glDrawArrays(GL_LINE_LOOP, 0, 10);
-    glDrawArrays(GL_LINE_STRIP, 0, 40);
+    glDrawArrays(GL_LINE_STRIP, 0, 5000);
     // glDrawArrays(GL_TRIANGLES, 0, 9);
     glBindVertexArray(0);
 
@@ -395,8 +412,8 @@ void Renderer::initCamera() {
     // Initialize the Camera
     // glm::vec3 pos = {0.0f, 0.0f, 3.0f};
     // glm::vec3 target = {0.0f, 0.0f, 0.0f};
-    glm::vec3 pos = {-40.0f, 0.0f, -10.0f};
-    glm::vec3 target = {-40.0f, 0.0f, -50.0f};
+    glm::vec3 pos = {-40.0f, 10.0f, -20.0f};
+    glm::vec3 target = {-40.0f, 0.0f, -45.0f};
     glm::vec3 up = {0.0f, 1.0f, 0.0f};
     this->camera_ = Camera(pos, target, up);
     this->camera_.initCamera();
@@ -409,12 +426,10 @@ void Renderer::initData() {
     AAssetManager *assetManager = app_->activity->assetManager;
     AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_100k.pcd", AASSET_MODE_BUFFER);
 
-    // cpoint_t pc_data[1024];
-    std::vector<cpoint_t> pc_data(1024);
-    float pc_data_ext[1024][6];
+    std::vector<cpoint_t> pc_data(5000);
 
     AAsset_seek(cloudData,96, SEEK_SET);
-    AAsset_read(cloudData,pc_data.data(), 42*sizeof(cpoint_t));
+    AAsset_read(cloudData,pc_data.data(), 5000*sizeof(cpoint_t));
 
     // printPointData(pc_data.data(), 1024, 0, 5);
 
@@ -424,10 +439,6 @@ void Renderer::initData() {
         pc_data[i].b = 0;
     }
 
-
-
-    //float (*)[6]
-    populateDataBuffer(pc_data, pc_data_ext, 1024);
 
     aout << "We should now have point cloud data\n";
 
@@ -440,31 +451,6 @@ void Renderer::initData() {
             8.0f, -15.0f, 0.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
     };
 
-
-
-    float vertices3[] = {
-            // Triangle 1   (Center)                    // Color (RGB)
-            0.0f,  1.5f, 10.0f,  1.0f, 0.0f, 0.0f,
-            -5.5f, -1.0f, 10.0f,  0.0f, 1.0f, 0.0f,
-            5.5f, -1.0f, 10.0f,  0.0f, 0.0f, 1.0f,
-
-            // Triangle 2    (Upper Left)                   // Color (RGB)
-            -5.0f,  12.4f, 0.0f,  1.0f, 0.0f, 0.0f,
-            -7.0f, 8.0f, 0.0f,  0.0f, 1.0f, 0.0f,
-            -2.0f, 7.6f, 0.0f,  0.0f, 0.0f, 1.0f,
-
-            // Triangle 3   (Lower Right)                    // Color (RGB)
-            7.0f,  -17.1f, -10.0f,  1.0f, 0.0f, 0.0f,
-            5.0f, -20.0f, -10.0f,  0.0f, 1.0f, 0.0f,
-            9.0f, -21.0f, -10.0f,  0.0f, 0.0f, 1.0f,
-    };
-
-
-    cpoint_t vertices2[] = {
-            {.x = -45.0f, .y = 12.0f, .z = -42.0f, .r = (uint8_t)255, .g = (uint8_t)0, .b = (uint8_t)0, .padding = 0},
-            {.x = -52.0f, .y = -10.0f, .z = -42.0f, .r = (uint8_t)0, .g = (uint8_t)255, .b = (uint8_t)0, .padding = 0},
-            {.x = -37.0f, .y = -15.0f, .z = -42.0f, .r = (uint8_t)0, .g = (uint8_t)0, .b = (uint8_t)255, .padding = 0}
-    };
 
     // Create and bind VAO and VBO
     glGenVertexArrays(1, &vao_);
@@ -491,16 +477,6 @@ void Renderer::initData() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
     glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(cpoint_t), (void*)(3 * sizeof(float)));
 
-
-    // For vertices2
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
-    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
-    // glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(cpoint_t), (void*)(3 * sizeof(float)));
-
-    // For pc_data_ext
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(pc_data_ext), pc_data_ext, GL_STATIC_DRAW);
-    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
-    // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)(3 * sizeof(float)));
 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
@@ -531,14 +507,6 @@ void Renderer::initRenderer() {
 
     // 4. Initialize our 'Camera', which will contain our view matrix
     initCamera();
-
-    // 5. Initialize view matrix
-    glm::mat4 viewMatrix = this->camera_.viewMatrix_;
-    // printMatrix(viewMatrix, "viewMatrix");
-
-    GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
-    glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
-
 
     // 6. Okay... let's try loading in vertices
     initData();
@@ -637,6 +605,41 @@ void Renderer::handleInput() {
                 break;
             case AKEY_EVENT_ACTION_UP:
                 aout << "Key Up";
+
+                switch (keyEvent.keyCode) {
+                    case 34: // 'f' key (x++)
+                        camera_.pos_[0]++;
+                        aout << "camera.x = " << camera_.pos_[0];
+                        updateViewMatrix_ = true;
+                        break;
+                    case 47: // 's' key (x--)
+                        camera_.pos_[0]--;
+                        aout << "camera.x = " << camera_.pos_[0];
+                        updateViewMatrix_ = true;
+                        break;
+                    case 33: // 'e' key (y++)
+                        camera_.pos_[1]++;
+                        aout << "camera.y = " << camera_.pos_[1];
+                        updateViewMatrix_ = true;
+                        break;
+                    case 32: // 'd' key (y--)
+                        camera_.pos_[1]--;
+                        aout << "camera.y = " << camera_.pos_[1];
+                        updateViewMatrix_ = true;
+                        break;
+                    case 51: // 'w' key (z++)
+                        camera_.pos_[2]++;
+                        aout << "camera.z = " << camera_.pos_[2];
+                        updateViewMatrix_ = true;
+                        break;
+                    case 45: // 'q' key (z--)
+                        camera_.pos_[2]--;
+                        aout << "camera.z = " << camera_.pos_[2];
+                        updateViewMatrix_ = true;
+                        break;
+
+                }
+
                 break;
             case AKEY_EVENT_ACTION_MULTIPLE:
                 // Deprecated since Android API level 29.
