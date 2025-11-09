@@ -12,6 +12,7 @@ add_library(renderingchallenge SHARED
         AndroidOut.cpp
         Renderer.cpp
         Camera.cpp
+        Octree.cpp
 )
 
 # Searches for a package provided by the game activity dependency

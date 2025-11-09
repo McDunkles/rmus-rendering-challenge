@@ -439,6 +439,7 @@ void Renderer::initCamera() {
     this->camera_ = Camera(pos, up);
 
     if (stateVars.hasAspectRatio) {
+        camera_.aspectRatio = float(width_) / float(height_);
         camera_.calcDistScalar();
     }
 }
@@ -471,13 +472,62 @@ void Renderer::initData() {
 
     aout << "Chunk metadata read in... ready to start loading in point cloud data!\n";
 
-    OctreeNode root(absoluteBounds, 0, 0);
+    OctreeNode *root = new OctreeNode(absoluteBounds, 0, 0);
+
 
     for (int i = 0; i<chunk_count; i++) {
-        root.insert(chunkData[i].bbox);
+        root->insert(chunkData[i].bbox, absoluteBounds);
     }
 
-    // OctreeNode desiredNode = root.getNode(targetPoint)
+    int maxDepth = root->getMaxDepth(root);
+    aout << "[INIT DATA] maxDepth = " << maxDepth << "\n";
+
+    root->assignAuxInfo(root, maxDepth);
+
+    // root->printTreeLeaves(root);
+
+
+    std::vector<OctreeNode *> nodeArrTest;
+    std::vector<uint32_t> posCodes = {0b011101, 0b011000, 0b001100, 0b000000, 0b111000, 0b111111};
+
+    aout << "[INIT DATA] Printing Nodes...\n";
+
+    for (int i = 0; i<6; i++) {
+        nodeArrTest.push_back(root->getNodeSoft(posCodes[i], maxDepth));
+
+        aout << "[" << i << "] ";
+
+        if (nodeArrTest[i] != nullptr) {
+            nodeArrTest[i]->printNode();
+        } else {
+            aout << "Node is null...\n";
+        }
+    }
+
+
+
+    // Get the maximum depth
+    // uint32_t posEncoding = 0;
+
+    // Now that the chunks are inserted, let's go back and insert some memory info into them
+
+
+
+    aout << "Camera Target:\n";
+    aout << "(x, y, z) = (" << camera_.target_.x << ", " <<
+    camera_.target_.y << ", " << camera_.target_.z << ")\n";
+
+
+    OctreeNode *desiredNode = root->getNode(camera_.target_);
+
+    // Load in this node
+
+/*
+    aout << "Sooooo this OctreeNode here.... octreeNum = " << desiredNode->octantNum
+    << "; depth = " << desiredNode->depth << "\n";
+
+    aout << "OctreeNum Lineage: " << desiredNode->getLineageStr() << "\n";
+*/
 
     // Finds which index the desired node should be at in memory
     // root.getSequentialLoc(desiredNode)
@@ -529,7 +579,9 @@ void Renderer::initData() {
     aout << "pc_data capacity = " << pc_data.capacity() << "\n";
 
     // For pc_data
-    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_STATIC_DRAW);
+    //glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_STATIC_DRAW);
+
+    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
     glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(cpoint_t), (void*)(3 * sizeof(float)));
 
