@@ -20,16 +20,28 @@ struct OctreeNode {
     int octantNum;
     bool is_leaf;
     std::vector<int> lineage;
-    int seqMemLoc;
     uint32_t encodedPosition;
 
-    int getDistance();
+    // Put these in aux info
+    uint64_t byteOffset;
+    uint32_t numPoints;
+
+    glm::vec3 getDisplacement(OctreeNode *node1, OctreeNode *node2);
+
+    int getDistance(OctreeNode *node1, OctreeNode *node2);
+
+    // Must be called on by the root node, which has the full bounding box
+    uint32_t getPosCode(glm::vec3 point, int maxDepth);
+
+    uint32_t getPosCodeExact(glm::vec3 point, BoundingBox absoluteBounds, int maxDepth);
 
     void printTreeLeaves(OctreeNode *root);
 
     void printNode();
 
     void assignAuxInfo(OctreeNode *node, int maxDepth);
+
+    void assignChunkMetadata(std::vector<ChunkMetadata> chunkData, int maxDepth);
 
     int getMaxDepth(OctreeNode *node);
 

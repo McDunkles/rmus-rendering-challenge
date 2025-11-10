@@ -444,12 +444,6 @@ void Renderer::initCamera() {
     }
 }
 
-typedef struct ChunkMetaMetaData {
-
-
-
-} CMMD_t;
-
 
 void Renderer::initData() {
     aout << "Attempting to read in point cloud data...\n";
@@ -477,16 +471,19 @@ void Renderer::initData() {
 
     for (int i = 0; i<chunk_count; i++) {
         root->insert(chunkData[i].bbox, absoluteBounds);
+
     }
 
     int maxDepth = root->getMaxDepth(root);
     aout << "[INIT DATA] maxDepth = " << maxDepth << "\n";
 
     root->assignAuxInfo(root, maxDepth);
+    root->assignChunkMetadata(chunkData, maxDepth);
+
 
     // root->printTreeLeaves(root);
 
-
+/*
     std::vector<OctreeNode *> nodeArrTest;
     std::vector<uint32_t> posCodes = {0b011101, 0b011000, 0b001100, 0b000000, 0b111000, 0b111111};
 
@@ -503,6 +500,7 @@ void Renderer::initData() {
             aout << "Node is null...\n";
         }
     }
+    */
 
 
 
@@ -518,21 +516,33 @@ void Renderer::initData() {
     camera_.target_.y << ", " << camera_.target_.z << ")\n";
 
 
-    OctreeNode *desiredNode = root->getNode(camera_.target_);
+    uint32_t posCode = root->getPosCode(camera_.target_, maxDepth);
+
+    aout << "posCode = " << posCode << "\n";
+
+    OctreeNode *desiredNode = root->getNode(posCode, maxDepth);
+
+    // OctreeNode *desiredNode = root->getNode(camera_.target_);
 
     // Load in this node
 
-/*
+
     aout << "Sooooo this OctreeNode here.... octreeNum = " << desiredNode->octantNum
     << "; depth = " << desiredNode->depth << "\n";
 
     aout << "OctreeNum Lineage: " << desiredNode->getLineageStr() << "\n";
-*/
+
 
     // Finds which index the desired node should be at in memory
     // root.getSequentialLoc(desiredNode)
 
     std::vector<cpoint_t> pc_data(5000);
+
+    // Buffer to hold the chunks
+    std::vector<std::vector<cpoint_t>> pc_buffer(30);
+    for (int i = 0; i<30; i++) {
+        pc_buffer[i].reserve(header.chunk_size);
+    }
 
     // AAsset_seek(cloudData,96, SEEK_SET);
     AAsset_read(cloudData,pc_data.data(), 5000*sizeof(cpoint_t));

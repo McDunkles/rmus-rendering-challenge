@@ -31,7 +31,10 @@ int OctreeNode::getMaxDepth(OctreeNode *node) {
     return nDepth;
 }
 
-
+/*
+ * Currently assigns:
+ * encodedPosition
+ */
 void OctreeNode::assignAuxInfo(OctreeNode *node, int maxDepth) {
 
     if (node != nullptr) {
@@ -57,9 +60,29 @@ void OctreeNode::assignAuxInfo(OctreeNode *node, int maxDepth) {
 }
 
 
+void OctreeNode::assignChunkMetadata(std::vector<ChunkMetadata> chunkData, int maxDepth) {
+
+    for (int i = 0; i<chunkData.size(); i++) {
+        glm::vec3 chunkCenter;
+        chunkData[i].bbox.getCenter(chunkCenter.x, chunkCenter.y, chunkCenter.z);
+
+        uint32_t posCode = getPosCode(chunkCenter, maxDepth);
+
+        OctreeNode *node = getNodeSoft(posCode, maxDepth);
+
+        node->byteOffset = chunkData[i].file_offset;
+        node->numPoints = chunkData[i].point_count;
+    }
+
+}
+
+
 void OctreeNode::printNode() {
     aout << "Depth = " << this->depth << "; Octant = " << this->octantNum
-         << "; posCode = " << this->encodedPosition << "\n";
+         << "; posCode = " << this->encodedPosition <<
+        "; ByteOffset = " << byteOffset <<
+        "; NumPoints = " << numPoints <<
+        "\n";
 }
 
 
@@ -75,7 +98,10 @@ void OctreeNode::printTreeLeaves(OctreeNode *root) {
                          // root->depth, root->octantNum, root->encodedPosition);
 
             aout << "Depth = " << root->depth << "; Octant = " << root->octantNum
-            << "; posCode = " << root->encodedPosition << "\n";
+            << "; posCode = " << root->encodedPosition <<
+            "; ByteOffset = " << root->byteOffset <<
+            "; NumPoints = " << root->numPoints <<
+            "\n";
         } else {
 
             for (int i = 0; i<std::size(root->children); i++) {
@@ -225,13 +251,86 @@ OctreeNode *OctreeNode::getNodeSoft(uint32_t posCode, int maxDepth) {
 }
 
 
+// Must be called on by the root node, which has the full bounding box
+uint32_t OctreeNode::getPosCode(glm::vec3 point, int maxDepth) {
+
+    uint32_t posCode = 0;
+    uint32_t bitMask = 0b111;
+
+    OctreeNode *node = this;
+
+    for (int i = 0; i<maxDepth; i++) {
+        int octant = node->getOctant(point.x, point.y, point.z);
+
+        if (node->children[octant] == nullptr) {
+            break;
+        } else {
+
+            posCode |= (octant & bitMask) << (3*(maxDepth - i - 1));
+            node = node->children[octant].get();
+        }
+    }
+
+    return posCode;
+}
+
+
+uint32_t OctreeNode::getPosCodeExact(glm::vec3 point, BoundingBox absoluteBounds, int maxDepth) {
+
+    uint32_t posCode = 0;
+
+    auto numSlices = (float)exp2(maxDepth);
+
+    glm::vec3 unitBox;
+    unitBox.x = (absoluteBounds.max_x - absoluteBounds.min_x) / numSlices;
+    unitBox.y = (absoluteBounds.max_y - absoluteBounds.min_y) / numSlices;
+    unitBox.z = (absoluteBounds.max_z - absoluteBounds.min_z) / numSlices;
+
+    auto unitsX = (uint32_t)floor((point.x - absoluteBounds.min_x)/unitBox.x);
+    auto unitsY = (uint32_t)floor((point.y - absoluteBounds.min_y)/unitBox.y);
+    auto unitsZ = (uint32_t)floor((point.z - absoluteBounds.min_z)/unitBox.z);
+
+    // aout << "getPCE() :: (ux, uy, uz) = (" << unitsX << ", " << unitsY
+    // << ", " << unitsZ << ")\n";
+
+    for (int i = 0; i<maxDepth; i++) {
+
+        uint32_t bitX = unitsX & ( 1 << (maxDepth - i - 1) );
+        uint32_t bitY = unitsY & ( 1 << (maxDepth - i - 1) );
+        uint32_t bitZ = unitsZ & ( 1 << (maxDepth - i - 1) );
+
+        uint32_t octant = (bitZ << 2) | (bitY << 1) | bitX;
+
+        posCode |= (octant) << ( 2*(maxDepth - i - 1) );
+
+    }
+
+    return posCode;
+}
+
+
+int OctreeNode::getDistance(OctreeNode *node1, OctreeNode *node2) {
+
+
+
+    return 0;
+}
+
+
+glm::vec3 OctreeNode::getDisplacement(OctreeNode *node1, OctreeNode *node2) {
+
+    return {};
+}
+
+
+
 OctreeNode *OctreeNode::getNode(glm::vec3 point) {
 
     // aout << "[Octree::getNode] (depth, octNum) = ("
     // << depth << ", " << octantNum << ")\n";
 
-    glm::vec3 bc;
-    bbox.getCenter(bc.x, bc.y, bc.z);
+    // glm::vec3 bc;
+    // bbox.getCenter(bc.x, bc.y, bc.z);
 
     // aout << "bbox = (" << bc.x << ", " << bc.y << ", " << bc.z << ")\n";
     int octant = getOctant(point.x, point.y, point.z);
