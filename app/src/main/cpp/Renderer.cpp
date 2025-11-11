@@ -514,19 +514,19 @@ void Renderer::initData() {
     AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_1m.pcd", AASSET_MODE_RANDOM);
     // AAsset *cloudData = AAssetManager_open(assetManager, "../../../../../beeg_pcd_files/pointcloud_1m.pcd", AASSET_MODE_RANDOM);
 
-    // std::ifstream pcd_file("../../../../../beeg_pcd_files/pointcloud_1m.pcd", std::ios::binary | std::ios::in);
-    // pcd_file.open("../../../../../beeg_pcd_files/pointcloud_1m.pcd", std::ios::binary | std::ios::in);
+    std::string internal_path(app_->activity->internalDataPath);
+    internal_path.append("/pointcloud_1m.pcd");
+    aout << "Internal Data Path = " << internal_path << "\n";
 
-    // pcd_file.getloc()
-
-    // pcd_file.close();
+    // std::ifstream pcd_file2(internal_path,std::ios::binary | std::ios::in);
+    pcd_file.open(internal_path,std::ios::binary | std::ios::in);
 
     FileHeader header;
-
-    // pcd_file.read(reinterpret_cast<char*>(&header), sizeof(FileHeader));
     AAsset_read(cloudData,&header, sizeof(FileHeader));
 
-    // absoluteBounds = header.bounds;
+    FileHeader header2;
+    pcd_file.read(reinterpret_cast<char*>(&header2), sizeof(FileHeader));
+
 
     octreeData.absoluteBounds = header.bounds;
 
@@ -534,10 +534,13 @@ void Renderer::initData() {
     aout << "Initializing dataset... there are [" << chunk_count << "] chunks in the data\n";
 
     std::vector<ChunkMetadata> chunkData(chunk_count);
-
-    // pcd_file.read(reinterpret_cast<char*>(chunkData.data()),
-                  // sizeof(ChunkMetadata) * chunk_count);
     AAsset_read(cloudData,chunkData.data(), sizeof(ChunkMetadata) * chunk_count);
+
+    std::vector<ChunkMetadata> chunkData2(chunk_count);
+    pcd_file.read(reinterpret_cast<char*>(chunkData2.data()), sizeof(ChunkMetadata) * chunk_count);
+    int chunk_count2 = header2.chunk_count;
+    aout << "chunk_count2 = " << chunk_count2 << "\n";
+    // pcd_file.close();
 
     aout << "Chunk metadata read in... ready to start loading in point cloud data!\n";
 
@@ -673,7 +676,17 @@ void Renderer::initData() {
 
     std::vector<cpoint_t> pc_data(num_points0);
 
+    std::vector<cpoint_t> pc_data2(num_points0);
+    pcd_file.seekg(desiredNode->byteOffset, std::ios_base::beg);
+    pcd_file.read(reinterpret_cast<char*>(pc_data2.data()),
+    num_points0*sizeof(cpoint_t));
+
+    // pcd_file.close();
+
+    // aout << "pc_data2 capacity = " << pc_data2.capacity() << "\n";
+
     AAsset_seek(cloudData,desiredNode->byteOffset, SEEK_SET);
+
 
     // pcd_file.seekg(desiredNode->byteOffset, std::ios_base::beg);
 
@@ -681,36 +694,11 @@ void Renderer::initData() {
                   // num_points0*sizeof(cpoint_t));
     AAsset_read(cloudData,pc_data.data(), num_points0*sizeof(cpoint_t));
 
-    // printPointData(pc_data.data(), 1024, 0, 5);
-
-    /*
-    for (int i = 0; i<20; i++) {
-        pc_data[i].r = 255;
-        pc_data[i].g = 0;
-        pc_data[i].b = 0;
-    }
-    */
-
-
     aout << "We should now have point cloud data\n";
-
-    // Define triangle vertices with positions (x, y, z) and colors (r, g, b)
-
-    /*
-    float vertices[] = {
-            // Position          // Color (RGB)
-            0.0f,  12.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
-            -7.0f, -10.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
-            8.0f, -15.0f, 0.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
-    };
-    */
-
 
     // Create and bind VAO and VBO
     glGenVertexArrays(1, &vao_);
     glGenBuffers(1, &vbo_);
-
-    // aout << "vao = " << vao_ << "\n";
 
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_);
@@ -731,7 +719,9 @@ void Renderer::initData() {
     // For pc_data
     //glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_STATIC_DRAW);
 
-    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_DYNAMIC_DRAW);
+    // aout << "pc_data2 capacity = " << pc_data2.capacity() << "\n";
+
+    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data2.capacity()), pc_data2.data(), GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
     glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(cpoint_t), (void*)(3 * sizeof(float)));
 
@@ -743,6 +733,8 @@ void Renderer::initData() {
     glBindVertexArray(0);
 
     aout << "Triangle initialized successfully" << std::endl;
+
+    pcd_file.close();
 }
 
 

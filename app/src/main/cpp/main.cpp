@@ -6,9 +6,12 @@
 #include <game-activity/GameActivity.cpp>
 #include <game-text-input/gametextinput.cpp>
 
+#include <fstream>
+
 extern "C" {
 
 #include <game-activity/native_app_glue/android_native_app_glue.c>
+
 
 /*!
  * Handles commands sent to this Android application
@@ -66,6 +69,23 @@ void android_main(struct android_app *pApp) {
     // Register an event handler for Android events
     pApp->onAppCmd = handle_cmd;
 
+    /*
+    std::string internal_stg = pApp->activity->internalDataPath;
+    internal_stg.append("/test_file.txt");
+
+    std::ofstream new_file(internal_stg, std::ios::out);
+
+    std::string msg = "test test test";
+    new_file.write(msg.data(), msg.size());
+
+    aout << "File written. Closing file.\n";
+
+    new_file.close();
+
+    aout << "File closed.\n";
+    */
+
+
     // Set input event filters (set it to NULL if the app wants to process all inputs).
     // Note that for key inputs, this example uses the default default_key_filter()
     // implemented in android_native_app_glue.c.
@@ -114,5 +134,6 @@ void android_main(struct android_app *pApp) {
             pRenderer->render();
         }
     } while (!pApp->destroyRequested);
+
 }
 }

@@ -4,6 +4,8 @@
 #include <EGL/egl.h>
 #include <memory>
 
+#include <fstream>
+
 #include "Model.h"
 #include "Shader.h"
 
@@ -105,6 +107,7 @@ private:
     OctreeData octreeData;
 
     std::vector<std::vector<struct Point>> pc_buffer;
+    std::ifstream pcd_file;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H
