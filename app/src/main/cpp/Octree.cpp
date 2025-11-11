@@ -141,6 +141,16 @@ void OctreeNode::insert(const BoundingBox& box, BoundingBox absolute_bounds) {
             children[octant] = std::make_unique<OctreeNode>(
                     worthyBox, octant, depth+1, this);
 
+            /*
+            aout << "BoxBounds: x = (" << worthyBox.min_x << ", " << worthyBox.max_x
+            << "); y = (" << worthyBox.min_y << ", " << worthyBox.max_y << ")" <<
+            "; z = (" << worthyBox.min_z << ", " << worthyBox.max_z << ")\n";
+
+            int oct2 = children[octant]->getOctant(-5, -30, -25);
+
+            aout << "Da octant = " << oct2 << "\n";
+            */
+
             // The box does not fit the child, so it becomes a
             // hand-me-down. Many such cases.
             children[octant]->insert(box, absolute_bounds);
@@ -154,7 +164,20 @@ void OctreeNode::insert(const BoundingBox& box, BoundingBox absolute_bounds) {
 }
 
 
-int OctreeNode::getOctant(float x, float y, float z) {
+int OctreeNode::getOctant(float x, float y, float z, bool pInfo) {
+
+    if (pInfo) {
+        aout << "[getOctant] BoundingBox: x = ("
+             << bbox.min_x << ", " << bbox.max_x
+             << "); y = (" << bbox.min_y << ", " << bbox.max_y << ")" <<
+             "; z = (" << bbox.min_z << ", " << bbox.max_z << ")\n";
+
+
+        aout << "[getOctant] Point = (" << x << ", " << y << ", "
+             << z << ")\n";
+    }
+
+
     float mid_x = (bbox.min_x + bbox.max_x) / 2.0f;
     float mid_y = (bbox.min_y + bbox.max_y) / 2.0f;
     float mid_z = (bbox.min_z + bbox.max_z) / 2.0f;
@@ -306,20 +329,6 @@ uint32_t OctreeNode::getPosCodeExact(glm::vec3 point, BoundingBox absoluteBounds
     }
 
     return posCode;
-}
-
-
-int OctreeNode::getDistance(OctreeNode *node1, OctreeNode *node2) {
-
-
-
-    return 0;
-}
-
-
-glm::vec3 OctreeNode::getDisplacement(OctreeNode *node1, OctreeNode *node2) {
-
-    return {};
 }
 
 

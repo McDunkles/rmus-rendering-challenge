@@ -59,7 +59,7 @@ uniform mat4 viewMat;
 
 void main() {
     fragColor = inColor/255.0f;
-    gl_Position = uProjection * modelMat * viewMat * vec4(inPosition, 1.0);
+    gl_Position = uProjection * viewMat * modelMat * vec4(inPosition, 1.0);
 }
 )vertex";
 
@@ -135,7 +135,7 @@ void printPointData(cpoint_t *buffer, int size, int start, int end) {
 Renderer::~Renderer() {
     if (display_ != EGL_NO_DISPLAY) {
         eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-        
+
         // Clean up OpenGL resources
         if (vbo_) {
             glDeleteBuffers(1, &vbo_);
@@ -146,7 +146,7 @@ Renderer::~Renderer() {
         if (shader_program_) {
             glDeleteProgram(shader_program_);
         }
-        
+
         if (context_ != EGL_NO_CONTEXT) {
             eglDestroyContext(display_, context_);
             context_ = EGL_NO_CONTEXT;
@@ -266,7 +266,7 @@ void Renderer::render() {
     // glDrawArrays(GL_POINTS, 0, 10);
     // glDrawArrays(GL_LINES, 0, 10);
     // glDrawArrays(GL_LINE_LOOP, 0, 10);
-    glDrawArrays(GL_LINE_STRIP, 0, 5000);
+    glDrawArrays(GL_LINE_STRIP, 0, 10000);
     // glDrawArrays(GL_TRIANGLES, 0, 9);
     glBindVertexArray(0);
 
@@ -431,10 +431,10 @@ void Renderer::initShaders() {
 
 void Renderer::initCamera() {
     // Initialize the Camera
-    // glm::vec3 pos = {0.0f, 0.0f, 3.0f};
+    glm::vec3 pos = {-15.0f, -15.0f, 8.5f};
     // glm::vec3 target = {0.0f, 0.0f, 0.0f};
-    glm::vec3 pos = {-5.0f, -20.0f, 0.f};
-    glm::vec3 target = {-5.0f, -30.0f, -25.0f};
+    // glm::vec3 pos = {-5.0f, -20.0f, 0.f};
+    // glm::vec3 target = {-5.0f, -30.0f, -25.0f};
     glm::vec3 up = {0.0f, 1.0f, 0.0f};
     this->camera_ = Camera(pos, up);
 
@@ -445,37 +445,125 @@ void Renderer::initCamera() {
 }
 
 
+void loadChunk(std::vector<std::vector<cpoint_t>> buffer) {
+
+}
+
+
+void Renderer::fetchChunks() {
+    // Assume renderBoxes is already filled
+
+    // Maybe for now, just use the far plane as the box bounds
+
+    int fHeight = camera_.distScalarY * camera_.zFar;
+    int fWidth = fHeight * camera_.aspectRatio;
+
+    glm::vec3 topRight = {
+            camera_.pos_.x + fWidth/2,
+            camera_.pos_.y + fHeight/2,
+            camera_.pos_.z + camera_.zFar
+    };
+
+
+    glm::vec3 botLeft = {
+            camera_.pos_.x - fWidth/2,
+            camera_.pos_.y - fHeight/2,
+            camera_.pos_.z
+    };
+
+
+    glm::vec3 unitSpans = {
+            fWidth/octreeData.unitBoxDims.x,
+            fHeight/octreeData.unitBoxDims.y,
+            camera_.zFar/octreeData.unitBoxDims.z
+    };
+
+    int maxDepth = octreeData.maxDepth;
+
+
+    // Fetch chunks/nodes based on these two values
+    uint32_t posCode1 = octreeData.root->getPosCode(botLeft, maxDepth);
+    uint32_t posCode2 = octreeData.root->getPosCode(topRight, maxDepth);
+
+
+    uint32_t xCoor = 0, yCoor = 0, zCoor = 0;
+
+    // Set these
+
+    // Subtract position coors, use that result to get the array of desired chunks
+
+    /*
+    for (int i = 0; i<1; i++) {
+        for (int j = 0; j<1; j++) {
+            for (int k = 0; k<1; k++) {
+
+            }
+        }
+    }
+    */
+
+
+
+}
+
+
 void Renderer::initData() {
     aout << "Attempting to read in point cloud data...\n";
 
     AAssetManager *assetManager = app_->activity->assetManager;
     AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_1m.pcd", AASSET_MODE_RANDOM);
+    // AAsset *cloudData = AAssetManager_open(assetManager, "../../../../../beeg_pcd_files/pointcloud_1m.pcd", AASSET_MODE_RANDOM);
 
+    // std::ifstream pcd_file("../../../../../beeg_pcd_files/pointcloud_1m.pcd", std::ios::binary | std::ios::in);
+    // pcd_file.open("../../../../../beeg_pcd_files/pointcloud_1m.pcd", std::ios::binary | std::ios::in);
+
+    // pcd_file.getloc()
+
+    // pcd_file.close();
 
     FileHeader header;
 
+    // pcd_file.read(reinterpret_cast<char*>(&header), sizeof(FileHeader));
     AAsset_read(cloudData,&header, sizeof(FileHeader));
 
-    absoluteBounds = header.bounds;
+    // absoluteBounds = header.bounds;
+
+    octreeData.absoluteBounds = header.bounds;
 
     int chunk_count = header.chunk_count;
     aout << "Initializing dataset... there are [" << chunk_count << "] chunks in the data\n";
 
     std::vector<ChunkMetadata> chunkData(chunk_count);
+
+    // pcd_file.read(reinterpret_cast<char*>(chunkData.data()),
+                  // sizeof(ChunkMetadata) * chunk_count);
     AAsset_read(cloudData,chunkData.data(), sizeof(ChunkMetadata) * chunk_count);
 
     aout << "Chunk metadata read in... ready to start loading in point cloud data!\n";
 
-    OctreeNode *root = new OctreeNode(absoluteBounds, 0, 0);
+    OctreeNode *root = new OctreeNode(octreeData.absoluteBounds, 0, 0);
+
+    octreeData.root = root;
 
 
     for (int i = 0; i<chunk_count; i++) {
-        root->insert(chunkData[i].bbox, absoluteBounds);
+        root->insert(chunkData[i].bbox, octreeData.absoluteBounds);
 
     }
 
     int maxDepth = root->getMaxDepth(root);
     aout << "[INIT DATA] maxDepth = " << maxDepth << "\n";
+
+    auto numSlices = (float)exp2(maxDepth);
+    glm::vec3 unitBox;
+    unitBox.x = (absoluteBounds.max_x - absoluteBounds.min_x) / numSlices;
+    unitBox.y = (absoluteBounds.max_y - absoluteBounds.min_y) / numSlices;
+    unitBox.z = (absoluteBounds.max_z - absoluteBounds.min_z) / numSlices;
+
+    octreeData.maxDepth = maxDepth;
+    octreeData.unitBoxDims = unitBox;
+
+    // BoundingBox unitBox =
 
     root->assignAuxInfo(root, maxDepth);
     root->assignChunkMetadata(chunkData, maxDepth);
@@ -516,11 +604,43 @@ void Renderer::initData() {
     camera_.target_.y << ", " << camera_.target_.z << ")\n";
 
 
+    // glm::vec3 target = {-5.0f, -30.0f, -25.0f};
     uint32_t posCode = root->getPosCode(camera_.target_, maxDepth);
 
     aout << "posCode = " << posCode << "\n";
 
+    // fetchChunks()
+
+
+
+
+
+    /*
+    OctreeNode *node0 = root->children[0].get();
+    int oct2 = node0->getOctant(camera_.target_.x, camera_.target_.y,
+                     camera_.target_.z, true);
+
+    aout << "node0 getOctant = " << oct2 << "\n";
+    */
+
     OctreeNode *desiredNode = root->getNode(posCode, maxDepth);
+
+    BoundingBox bbox0 = desiredNode->bbox;
+
+    // Camera Position = (-5, -20, 0)
+    // Camera Target = (-5, -20, -20)
+    /* Desired Node Box
+     * x -> (-28.30, -2.26)
+     * y -> (-17.89, -13.28)
+     * z -> (-24.16, 1.61)
+
+    */
+
+    aout << "[initData] node0->BoundingBox: x = ("
+         << bbox0.min_x << ", " << bbox0.max_x
+         << "); y = (" << bbox0.min_y << ", " << bbox0.max_y << ")" <<
+         "; z = (" << bbox0.min_z << ", " << bbox0.max_z << ")\n";
+
 
     // OctreeNode *desiredNode = root->getNode(camera_.target_);
 
@@ -532,45 +652,65 @@ void Renderer::initData() {
 
     aout << "OctreeNum Lineage: " << desiredNode->getLineageStr() << "\n";
 
+    desiredNode->printNode();
 
     // Finds which index the desired node should be at in memory
     // root.getSequentialLoc(desiredNode)
 
-    std::vector<cpoint_t> pc_data(5000);
-
     // Buffer to hold the chunks
-    std::vector<std::vector<cpoint_t>> pc_buffer(30);
+    // std::vector<std::vector<cpoint_t>> pc_buffer(30);
+    pc_buffer.reserve(30);
     for (int i = 0; i<30; i++) {
         pc_buffer[i].reserve(header.chunk_size);
     }
 
-    // AAsset_seek(cloudData,96, SEEK_SET);
-    AAsset_read(cloudData,pc_data.data(), 5000*sizeof(cpoint_t));
+
+    int num_points0 = desiredNode->numPoints;
+
+
+    aout << "num_points0 = " << num_points0 << "\n";
+    aout << "offset0 = " << desiredNode->byteOffset << "\n";
+
+    std::vector<cpoint_t> pc_data(num_points0);
+
+    AAsset_seek(cloudData,desiredNode->byteOffset, SEEK_SET);
+
+    // pcd_file.seekg(desiredNode->byteOffset, std::ios_base::beg);
+
+    // pcd_file.read(reinterpret_cast<char*>(pc_data.data()),
+                  // num_points0*sizeof(cpoint_t));
+    AAsset_read(cloudData,pc_data.data(), num_points0*sizeof(cpoint_t));
 
     // printPointData(pc_data.data(), 1024, 0, 5);
 
+    /*
     for (int i = 0; i<20; i++) {
         pc_data[i].r = 255;
         pc_data[i].g = 0;
         pc_data[i].b = 0;
     }
+    */
 
 
     aout << "We should now have point cloud data\n";
 
     // Define triangle vertices with positions (x, y, z) and colors (r, g, b)
 
+    /*
     float vertices[] = {
             // Position          // Color (RGB)
             0.0f,  12.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Top vertex - Red
             -7.0f, -10.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Bottom left - Green
             8.0f, -15.0f, 0.0f,  0.0f, 0.0f, 1.0f   // Bottom right - Blue
     };
+    */
 
 
     // Create and bind VAO and VBO
     glGenVertexArrays(1, &vao_);
     glGenBuffers(1, &vbo_);
+
+    // aout << "vao = " << vao_ << "\n";
 
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_);

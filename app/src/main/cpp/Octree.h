@@ -26,10 +26,6 @@ struct OctreeNode {
     uint64_t byteOffset;
     uint32_t numPoints;
 
-    glm::vec3 getDisplacement(OctreeNode *node1, OctreeNode *node2);
-
-    int getDistance(OctreeNode *node1, OctreeNode *node2);
-
     // Must be called on by the root node, which has the full bounding box
     uint32_t getPosCode(glm::vec3 point, int maxDepth);
 
@@ -77,7 +73,7 @@ struct OctreeNode {
 
     void insert(const BoundingBox& box, BoundingBox absolute_bounds);
 
-    int getOctant(float x, float y, float z);
+    int getOctant(float x, float y, float z, bool pInfo = false);
 
     BoundingBox subdivide(int octant);
 

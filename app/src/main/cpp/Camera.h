@@ -43,7 +43,7 @@ public:
 
     explicit inline Camera(glm::vec3 pos, glm::vec3 up)
             : pos_(pos), up_(up) {
-        target_ = {pos.x, pos.y, pos.z - (zFar - zNear)/2};
+        target_ = {pos.x, pos.y, pos.z - (zFar)/2};
         initCamera();
     }
 

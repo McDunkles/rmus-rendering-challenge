@@ -10,6 +10,9 @@
 #include "Camera.h"
 
 #include "RendererState.h"
+#include "OctreeData.h"
+
+
 #include "../../../../tools/PointCloudData.h"
 
 struct android_app;
@@ -75,6 +78,8 @@ private:
 
     void setRenderBoxes();
 
+    void fetchChunks();
+
 
     android_app *app_;
     EGLDisplay display_;
@@ -96,7 +101,10 @@ private:
     GLuint vbo_;
 
     BoundingBox absoluteBounds;
-    std::vector<glm::vec4> renderBoxes;
+    std::vector<glm::vec2> renderBoxes;
+    OctreeData octreeData;
+
+    std::vector<std::vector<struct Point>> pc_buffer;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H
