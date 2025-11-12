@@ -2,6 +2,7 @@
 
 #include "AndroidOut.h"
 #include "Renderer.h"
+#include "Testbench.h"
 
 #include <game-activity/GameActivity.cpp>
 #include <game-text-input/gametextinput.cpp>
@@ -11,6 +12,8 @@
 extern "C" {
 
 #include <game-activity/native_app_glue/android_native_app_glue.c>
+
+#define RMUS_TESTING 0
 
 
 /*!
@@ -69,71 +72,65 @@ void android_main(struct android_app *pApp) {
     // Register an event handler for Android events
     pApp->onAppCmd = handle_cmd;
 
-    /*
-    std::string internal_stg = pApp->activity->internalDataPath;
-    internal_stg.append("/test_file.txt");
-
-    std::ofstream new_file(internal_stg, std::ios::out);
-
-    std::string msg = "test test test";
-    new_file.write(msg.data(), msg.size());
-
-    aout << "File written. Closing file.\n";
-
-    new_file.close();
-
-    aout << "File closed.\n";
-    */
-
-
     // Set input event filters (set it to NULL if the app wants to process all inputs).
     // Note that for key inputs, this example uses the default default_key_filter()
     // implemented in android_native_app_glue.c.
     android_app_set_motion_event_filter(pApp, motion_event_filter_func);
 
-    // This sets up a typical game/event loop. It will run until the app is destroyed.
-    do {
-        // Process all pending events before running game logic.
-        bool done = false;
-        while (!done) {
-            // 0 is non-blocking.
-            int timeout = 0;
-            int events;
-            android_poll_source *pSource;
-            int result = ALooper_pollOnce(timeout, nullptr, &events,
-                                          reinterpret_cast<void**>(&pSource));
-            switch (result) {
-                case ALOOPER_POLL_TIMEOUT:
-                    [[clang::fallthrough]];
-                case ALOOPER_POLL_WAKE:
-                    // No events occurred before the timeout or explicit wake. Stop checking for events.
-                    done = true;
-                    break;
-                case ALOOPER_EVENT_ERROR:
-                    aout << "ALooper_pollOnce returned an error" << std::endl;
-                    break;
-                case ALOOPER_POLL_CALLBACK:
-                    break;
-                default:
-                    if (pSource) {
-                        pSource->process(pApp, pSource);
-                    }
+
+    if (RMUS_TESTING) {
+        aout << "Running Testbench\n";
+
+
+        // pApp->userData = new Renderer(pApp);
+
+    } else {
+        aout << "Running main program!\n";
+
+        // This sets up a typical game/event loop. It will run until the app is destroyed.
+        do {
+            // Process all pending events before running game logic.
+            bool done = false;
+            while (!done) {
+                // 0 is non-blocking.
+                int timeout = 0;
+                int events;
+                android_poll_source *pSource;
+                int result = ALooper_pollOnce(timeout, nullptr, &events,
+                                              reinterpret_cast<void**>(&pSource));
+                switch (result) {
+                    case ALOOPER_POLL_TIMEOUT:
+                        [[clang::fallthrough]];
+                    case ALOOPER_POLL_WAKE:
+                        // No events occurred before the timeout or explicit wake. Stop checking for events.
+                        done = true;
+                        break;
+                    case ALOOPER_EVENT_ERROR:
+                        aout << "ALooper_pollOnce returned an error" << std::endl;
+                        break;
+                    case ALOOPER_POLL_CALLBACK:
+                        break;
+                    default:
+                        if (pSource) {
+                            pSource->process(pApp, pSource);
+                        }
+                }
             }
-        }
 
-        // Check if any user data is associated. This is assigned in handle_cmd
-        if (pApp->userData) {
-            // We know that our user data is a Renderer, so reinterpret cast it. If you change your
-            // user data remember to change it here
-            auto *pRenderer = reinterpret_cast<Renderer *>(pApp->userData);
+            // Check if any user data is associated. This is assigned in handle_cmd
+            if (pApp->userData) {
+                // We know that our user data is a Renderer, so reinterpret cast it. If you change your
+                // user data remember to change it here
+                auto *pRenderer = reinterpret_cast<Renderer *>(pApp->userData);
 
-            // Process game input
-            pRenderer->handleInput();
+                // Process game input
+                pRenderer->handleInput();
 
-            // Render a frame
-            pRenderer->render();
-        }
-    } while (!pApp->destroyRequested);
+                // Render a frame
+                pRenderer->render();
+            }
+        } while (!pApp->destroyRequested);
+    }
 
 }
 }

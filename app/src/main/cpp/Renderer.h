@@ -108,6 +108,7 @@ private:
 
     std::vector<std::vector<struct Point>> pc_buffer;
     std::ifstream pcd_file;
+    std::ifstream pcd_file_dbg;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H

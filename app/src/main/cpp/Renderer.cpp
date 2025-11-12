@@ -14,6 +14,7 @@
 
 #include "../../../../tools/PointCloudData.h"
 #include "Octree.h"
+#include "Testbench.h"
 
 #include <iostream>
 #include <fstream>
@@ -133,6 +134,15 @@ void printPointData(cpoint_t *buffer, int size, int start, int end) {
 
 
 Renderer::~Renderer() {
+
+    if (pcd_file.is_open()) {
+        pcd_file.close();
+    }
+
+    if (pcd_file_dbg.is_open()) {
+        pcd_file_dbg.close();
+    }
+
     if (display_ != EGL_NO_DISPLAY) {
         eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 
@@ -510,23 +520,14 @@ void Renderer::fetchChunks() {
 void Renderer::initData() {
     aout << "Attempting to read in point cloud data...\n";
 
-    AAssetManager *assetManager = app_->activity->assetManager;
-    AAsset *cloudData = AAssetManager_open(assetManager, "pointcloud_1m.pcd", AASSET_MODE_RANDOM);
-    // AAsset *cloudData = AAssetManager_open(assetManager, "../../../../../beeg_pcd_files/pointcloud_1m.pcd", AASSET_MODE_RANDOM);
-
     std::string internal_path(app_->activity->internalDataPath);
-    internal_path.append("/pointcloud_1m.pcd");
-    aout << "Internal Data Path = " << internal_path << "\n";
-
-    // std::ifstream pcd_file2(internal_path,std::ios::binary | std::ios::in);
+    internal_path.append("/pointcloud_100m.pcd");
     pcd_file.open(internal_path,std::ios::binary | std::ios::in);
 
+    aout << "Internal Data Path = " << internal_path << "\n";
+
     FileHeader header;
-    AAsset_read(cloudData,&header, sizeof(FileHeader));
-
-    FileHeader header2;
-    pcd_file.read(reinterpret_cast<char*>(&header2), sizeof(FileHeader));
-
+    pcd_file.read(reinterpret_cast<char*>(&header), sizeof(FileHeader));
 
     octreeData.absoluteBounds = header.bounds;
 
@@ -534,28 +535,20 @@ void Renderer::initData() {
     aout << "Initializing dataset... there are [" << chunk_count << "] chunks in the data\n";
 
     std::vector<ChunkMetadata> chunkData(chunk_count);
-    AAsset_read(cloudData,chunkData.data(), sizeof(ChunkMetadata) * chunk_count);
-
-    std::vector<ChunkMetadata> chunkData2(chunk_count);
-    pcd_file.read(reinterpret_cast<char*>(chunkData2.data()), sizeof(ChunkMetadata) * chunk_count);
-    int chunk_count2 = header2.chunk_count;
-    aout << "chunk_count2 = " << chunk_count2 << "\n";
-    // pcd_file.close();
+    pcd_file.read(reinterpret_cast<char*>(chunkData.data()), sizeof(ChunkMetadata) * chunk_count);
 
     aout << "Chunk metadata read in... ready to start loading in point cloud data!\n";
 
     OctreeNode *root = new OctreeNode(octreeData.absoluteBounds, 0, 0);
-
     octreeData.root = root;
-
 
     for (int i = 0; i<chunk_count; i++) {
         root->insert(chunkData[i].bbox, octreeData.absoluteBounds);
-
     }
 
     int maxDepth = root->getMaxDepth(root);
     aout << "[INIT DATA] maxDepth = " << maxDepth << "\n";
+
 
     auto numSlices = (float)exp2(maxDepth);
     glm::vec3 unitBox;
@@ -565,8 +558,6 @@ void Renderer::initData() {
 
     octreeData.maxDepth = maxDepth;
     octreeData.unitBoxDims = unitBox;
-
-    // BoundingBox unitBox =
 
     root->assignAuxInfo(root, maxDepth);
     root->assignChunkMetadata(chunkData, maxDepth);
@@ -594,14 +585,7 @@ void Renderer::initData() {
     */
 
 
-
-    // Get the maximum depth
-    // uint32_t posEncoding = 0;
-
     // Now that the chunks are inserted, let's go back and insert some memory info into them
-
-
-
     aout << "Camera Target:\n";
     aout << "(x, y, z) = (" << camera_.target_.x << ", " <<
     camera_.target_.y << ", " << camera_.target_.z << ")\n";
@@ -609,26 +593,11 @@ void Renderer::initData() {
 
     // glm::vec3 target = {-5.0f, -30.0f, -25.0f};
     uint32_t posCode = root->getPosCode(camera_.target_, maxDepth);
-
     aout << "posCode = " << posCode << "\n";
 
-    // fetchChunks()
-
-
-
-
-
-    /*
-    OctreeNode *node0 = root->children[0].get();
-    int oct2 = node0->getOctant(camera_.target_.x, camera_.target_.y,
-                     camera_.target_.z, true);
-
-    aout << "node0 getOctant = " << oct2 << "\n";
-    */
-
     OctreeNode *desiredNode = root->getNode(posCode, maxDepth);
-
     BoundingBox bbox0 = desiredNode->bbox;
+
 
     // Camera Position = (-5, -20, 0)
     // Camera Target = (-5, -20, -20)
@@ -644,11 +613,17 @@ void Renderer::initData() {
          << "); y = (" << bbox0.min_y << ", " << bbox0.max_y << ")" <<
          "; z = (" << bbox0.min_z << ", " << bbox0.max_z << ")\n";
 
+    /*
+    aout << "[initData] node1->BoundingBox: x = ("
+         << bbox1.min_x << ", " << bbox1.max_x
+         << "); y = (" << bbox1.min_y << ", " << bbox1.max_y << ")" <<
+         "; z = (" << bbox1.min_z << ", " << bbox1.max_z << ")\n";
+    */
+
 
     // OctreeNode *desiredNode = root->getNode(camera_.target_);
 
     // Load in this node
-
 
     aout << "Sooooo this OctreeNode here.... octreeNum = " << desiredNode->octantNum
     << "; depth = " << desiredNode->depth << "\n";
@@ -676,23 +651,9 @@ void Renderer::initData() {
 
     std::vector<cpoint_t> pc_data(num_points0);
 
-    std::vector<cpoint_t> pc_data2(num_points0);
     pcd_file.seekg(desiredNode->byteOffset, std::ios_base::beg);
-    pcd_file.read(reinterpret_cast<char*>(pc_data2.data()),
+    pcd_file.read(reinterpret_cast<char*>(pc_data.data()),
     num_points0*sizeof(cpoint_t));
-
-    // pcd_file.close();
-
-    // aout << "pc_data2 capacity = " << pc_data2.capacity() << "\n";
-
-    AAsset_seek(cloudData,desiredNode->byteOffset, SEEK_SET);
-
-
-    // pcd_file.seekg(desiredNode->byteOffset, std::ios_base::beg);
-
-    // pcd_file.read(reinterpret_cast<char*>(pc_data.data()),
-                  // num_points0*sizeof(cpoint_t));
-    AAsset_read(cloudData,pc_data.data(), num_points0*sizeof(cpoint_t));
 
     aout << "We should now have point cloud data\n";
 
@@ -717,11 +678,7 @@ void Renderer::initData() {
     aout << "pc_data capacity = " << pc_data.capacity() << "\n";
 
     // For pc_data
-    //glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_STATIC_DRAW);
-
-    // aout << "pc_data2 capacity = " << pc_data2.capacity() << "\n";
-
-    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data2.capacity()), pc_data2.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
     glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(cpoint_t), (void*)(3 * sizeof(float)));
 
@@ -733,8 +690,6 @@ void Renderer::initData() {
     glBindVertexArray(0);
 
     aout << "Triangle initialized successfully" << std::endl;
-
-    pcd_file.close();
 }
 
 
