@@ -25,7 +25,7 @@ typedef struct InputEventState {
 
 
 struct RendStateVars {
-    bool hasAspectRatio;
+    bool hasAspectRatio = false;
 };
 
 

@@ -16,6 +16,7 @@
 
 
 #include "../../../../tools/PointCloudData.h"
+#include "RenderBox.h"
 
 struct android_app;
 
@@ -78,7 +79,9 @@ private:
     void updateRenderArea();
 
 
-    void setRenderBoxes();
+    void setRenderBox();
+
+    void initRenderBox();
 
     void fetchChunks();
 
@@ -109,6 +112,8 @@ private:
     std::vector<std::vector<struct Point>> pc_buffer;
     std::ifstream pcd_file;
     std::ifstream pcd_file_dbg;
+
+    RenderBox renderBox;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H

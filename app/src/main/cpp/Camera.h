@@ -16,16 +16,16 @@ class Camera {
 
 public:
 
-    static constexpr float zNear = 0.5f;
-    static constexpr float zFar = 40.f;
+    float zNear = 0.5f;
+    float zFar = 8.f;
 
-    glm::vec3 pos_;
+    glm::vec3 pos_ = {0.f, 0.f, 0.f};
     glm::vec3 target_;
     glm::vec3 up_;
     glm::mat4 viewMatrix_;
     float aspectRatio = 1;
     float fovy = glm::pi<float>()/3.0f;
-    float distScalarY;
+    float distScalarY = 1.f;
     float targetDist;
 
     glm::vec2 tiltBuffer;
@@ -54,6 +54,8 @@ public:
     }
 
     void initCamera();
+
+    void setAspectRatio(float ar);
 
     void updateViewMatrix();
 

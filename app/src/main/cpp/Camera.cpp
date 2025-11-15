@@ -11,6 +11,7 @@
 
 void Camera::initCamera() {
 
+
     // Create the view matrix
     glm::mat4 viewMatrix = glm::lookAt(pos_, target_, up_);
 
@@ -21,9 +22,9 @@ void Camera::initCamera() {
     tiltCount = 0;
     tiltThreshold = 3;
 
-    fovy = glm::pi<float>()/3.0f;
+    fovy = glm::pi<float>()/4.0f;
 
-    aout << "Camera created! Target Distance = " << targetDist;
+    aout << "Camera created! Target Distance = " << targetDist << "\n";
 }
 
 void Camera::updateViewMatrix() {
@@ -33,6 +34,13 @@ void Camera::updateViewMatrix() {
     viewMatrix_ = viewMatrix;
 }
 
+void Camera::setAspectRatio(float ar) {
+
+    aspectRatio = ar;
+
+    aout << "[Camera::setAspectRatio] aspectRatio = " << aspectRatio << "\n";
+
+}
 
 void Camera::calcDistScalar() {
     // Calculate near bounds, far bounds, and bounds at the target

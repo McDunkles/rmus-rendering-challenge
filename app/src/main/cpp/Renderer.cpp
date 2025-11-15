@@ -172,7 +172,7 @@ Renderer::~Renderer() {
 
 
 // Aspect ratio must be known first
-void Renderer::setRenderBoxes() {
+void Renderer::setRenderBox() {
 
     // Let's start with four boxes
 
@@ -302,6 +302,11 @@ void populateDataBuffer(std::vector<cpoint_t>& srcData, float dest[1024][6], int
 
 
 void Renderer::initCore() {
+
+    // make width and height invalid so it gets updated the first frame in @a updateRenderArea()
+    width_ = -1;
+    height_ = -1;
+
     // Choose your render attributes
     constexpr EGLint attribs[] = {
             EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
@@ -365,25 +370,32 @@ void Renderer::initCore() {
     surface_ = surface;
     context_ = context;
 
+    updateRenderArea();
 
+    /*
     EGLint width;
     eglQuerySurface(display_, surface_, EGL_WIDTH, &width);
 
     EGLint height;
     eglQuerySurface(display_, surface_, EGL_HEIGHT, &height);
+*/
 
-    aout << "CORE INIT: (width, height) = (" << width << ", " << height << ")\n";
+    if (height_ != 0 && width_ != 0) {
+        aout << "Has aspect ratio\n";
+        stateVars.hasAspectRatio = true;
+    }
+
+
+    aout << "CORE INIT: (width, height) = (" << width_ << ", " << height_ << ")\n";
 }
 
 void Renderer::initShaders() {
-    // make width and height invalid so it gets updated the first frame in @a updateRenderArea()
-    width_ = -1;
-    height_ = -1;
 
     PRINT_GL_STRING(GL_VENDOR);
     PRINT_GL_STRING(GL_RENDERER);
     PRINT_GL_STRING(GL_VERSION);
-    PRINT_GL_STRING_AS_LIST(GL_EXTENSIONS);
+    // PRINT_GL_STRING_AS_LIST(GL_EXTENSIONS);
+
 
     // setup any other gl related global states
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -439,6 +451,333 @@ void Renderer::initShaders() {
 }
 
 
+void loadChunk(std::vector<std::vector<cpoint_t>> buffer) {
+
+}
+
+/*
+ * dim:
+ * 0 -> x
+ * 1 -> y
+ * 2 -> z
+ *
+ * returns the incrmented posCode
+ */
+uint32_t shiftPosCode(uint32_t dim, uint32_t posCodeOld, int maxDepth, bool backwards = false) {
+
+    uint32_t bitMaskXYZ = 0;
+
+    for (int i = 0; i<maxDepth; i++) {
+        bitMaskXYZ |= (1) << (3*i + dim);
+    }
+
+    uint32_t posCodeMasked = posCodeOld & bitMaskXYZ;
+    uint32_t posCodeNew = posCodeOld;
+
+    uint32_t bitMaskTemp = 0b111;
+    uint32_t slidingBitMask = 0;
+
+    std::vector<bool> posCodeBits(maxDepth, false);
+    bool stacked = false;
+
+    for (int i = 0; i<maxDepth; i++) {
+
+        slidingBitMask = (1 << (3*i));
+
+        posCodeBits[i] = (posCodeMasked >> (3*i + dim)) & bitMaskTemp;
+
+        if (backwards) {
+            stacked = !(std::any_of(posCodeBits.begin(), posCodeBits.begin()+i, [](bool n) {return n;}) );
+        } else {
+            stacked = std::all_of(posCodeBits.begin(), posCodeBits.begin()+i, [](bool n) {return n;});
+        }
+        posCodeNew = posCodeNew & (~(slidingBitMask << dim));
+        posCodeNew |= (stacked ^ (uint32_t)posCodeBits[i]) << (3*i + dim);
+    }
+
+    // aout << "Incremented posCodeBL_Y2 = " << posCodeBL_Y2 << "\n";
+
+    return posCodeNew;
+}
+
+
+
+void Renderer::fetchChunks() {
+    // Assume renderBoxes is already filled
+
+    // Maybe for now, just use the far plane as the box bounds
+
+    OctreeNode *root = octreeData.root;
+    int maxDepth = octreeData.maxDepth;
+
+    float halfHeight = camera_.zFar * camera_.distScalarY;
+    float halfWidth = halfHeight * camera_.aspectRatio;
+
+
+    glm::vec3 botLeftPos = {
+            camera_.pos_.x - halfWidth,
+            camera_.pos_.y - halfHeight,
+            camera_.pos_.z - camera_.zFar
+    };
+
+
+    glm::vec3 topRightPos = {
+            camera_.pos_.x + halfWidth,
+            camera_.pos_.y + halfHeight,
+            camera_.pos_.z
+    };
+
+
+    aout << "Bottom Left Point: (x, y, z) = (" << botLeftPos.x << ", " <<
+         botLeftPos.y << ", " << botLeftPos.z << ")\n";
+
+    uint32_t posCodeBL = root->getPosCode(botLeftPos, maxDepth);
+    aout << "posCodeBL = " << posCodeBL << "\n";
+
+
+    uint32_t posCodeTR = root->getPosCode(topRightPos, maxDepth);
+    // aout << "Top Right Point: (x, y, z) = (" << topRightPos.x << ", " <<
+    //      topRightPos.y << ", " << topRightPos.z << ")\n";
+    // aout << "posCodeTR = " << posCodeTR << "\n";
+
+    // get x index
+    uint32_t bitMaskX = 0;
+    uint32_t bitMaskY = 0;
+    uint32_t bitMaskZ = 0;
+
+    for (int i = 0; i<maxDepth; i++) {
+        bitMaskX |= (1) << (3*i);
+        bitMaskY |= (1) << (3*i + 1);
+        bitMaskZ |= (1) << (3*i + 2);
+    }
+
+    // aout << "bitMaskX = " << bitMaskX << "\n";
+    // aout << "bitMaskY = " << bitMaskY << "\n";
+    // aout << "bitMaskZ = " << bitMaskZ << "\n";
+
+
+    uint32_t posCodeBL_X = posCodeBL & bitMaskX;
+    uint32_t posCodeBL_Y = posCodeBL & bitMaskY;
+    uint32_t posCodeBL_Z = posCodeBL & bitMaskZ;
+
+    uint32_t posCodeTR_X = posCodeTR & bitMaskX;
+    uint32_t posCodeTR_Y = posCodeTR & bitMaskY;
+    uint32_t posCodeTR_Z = posCodeTR & bitMaskZ;
+
+    // aout << "posCodeTR_Z = " << posCodeTR_Z << "\n";
+
+    uint32_t indexBL_X = 0;
+    uint32_t indexBL_Y = 0;
+    uint32_t indexBL_Z = 0;
+
+    uint32_t indexTR_X = 0;
+    uint32_t indexTR_Y = 0;
+    uint32_t indexTR_Z = 0;
+
+    uint32_t bitMaskTemp = 0b111;
+    uint32_t temp = 0;
+
+    for (int i = 0; i<maxDepth; i++) {
+        // Bottom Left indices
+        temp = (posCodeBL_X >> (3*i)) & bitMaskTemp;
+        indexBL_X |= (temp << i);
+
+        temp = (posCodeBL_Y >> (3*i)) & bitMaskTemp;
+        temp = temp >> 1;
+        indexBL_Y |= (temp << i);
+
+        temp = (posCodeBL_Z >> (3*i)) & bitMaskTemp;
+        temp = temp >> 2;
+        indexBL_Z |= (temp << i);
+
+        // Top Right indices
+        temp = (posCodeTR_X >> (3*i)) & bitMaskTemp;
+        indexTR_X |= (temp << i);
+
+        temp = (posCodeTR_Y >> (3*i)) & bitMaskTemp;
+        temp = temp >> 1;
+        indexTR_Y |= (temp << i);
+
+        temp = (posCodeTR_Z >> (3*i)) & bitMaskTemp;
+        temp = temp >> 2;
+        indexTR_Z |= (temp << i);
+    }
+
+    // aout << "Bottom Left RenderBox Indicies:\n x = " << indexBL_X <<
+    // "; y = " << indexBL_Y << "; z = " << indexBL_Z << "\n";
+
+    aout << "Top Right RenderBox Indicies:\n x = " << indexTR_X <<
+         "; y = " << indexTR_Y << "; z = " << indexTR_Z << "\n";
+
+    uint32_t startingIndex = posCodeBL;
+
+    OctreeNode *nodeBL = root->getNodeSoft(posCodeBL, maxDepth);
+
+    // uint32_t bitMaskX
+    int lenX = indexTR_X - indexBL_X;
+    int lenY = indexTR_Y - indexBL_Y;
+    int lenZ = indexTR_Z - indexBL_Z;
+
+    uint32_t posCodeTemp = posCodeBL;
+    int rb_index = 0;
+
+    int totalSpan = (lenX+1)*(lenY+1)*(lenZ+1);
+
+    if (totalSpan > renderBox.totalSize) {
+        aout << "Problem: Total Size = " << totalSpan << ", but renderBox.totalSize = "
+        << renderBox.totalSize << "\n";
+
+    } else {
+        aout << "Loading in Chunks: Total Size = " << totalSpan
+        << "; renderBox.totalSize = "
+         << renderBox.totalSize << "\n";
+
+        // Do the loading stuff
+
+        OctreeNode *currNode = nullptr, *prevNode = nullptr;
+
+        int nodes_loaded = 0, nodes_bounced = 0;
+
+        for (int i = 0; i <= lenZ; i++) {
+            for (int j = 0; j <= lenY; j++) {
+                for (int k = 0; k <= lenX; k ++) {
+                    rb_index = k + (renderBox.bufferDims.x * j)
+                               + (renderBox.bufferDims.y * renderBox.bufferDims.x * i);
+
+                    currNode = root->getNodeSoft(posCodeTemp, maxDepth);
+
+                    if (currNode != nullptr) {
+
+                        if (prevNode == nullptr ||
+                        (currNode->encodedPosition != prevNode->encodedPosition)) {
+
+                            if (rb_index >= 18) {
+                                aout << "posCodeTemp = " << posCodeTemp <<
+                                     "; currNode->encPos = " << currNode->encodedPosition << "\n";
+                            }
+
+                            int num_points = currNode->numPoints;
+
+
+                            // Load the chunk in
+                            pcd_file.seekg(currNode->byteOffset, std::ios_base::beg);
+                            pcd_file.read(reinterpret_cast<char*>(renderBox.pcd_buffer[rb_index].data()),
+                                            num_points*sizeof(cpoint_t));
+
+
+                            nodes_loaded++;
+
+                        }
+
+                    }
+
+                    // Update prevNode
+                    prevNode = root->getNodeSoft(posCodeTemp, maxDepth);
+
+                    posCodeTemp = shiftPosCode(0, posCodeTemp, maxDepth);
+                }
+
+                // Shift posCode back to start in the x direction
+                // Yes this kills me to do but... it's simple and will work
+                for (int k = 0; k <= lenX; k ++) {
+                    posCodeTemp = shiftPosCode(0, posCodeTemp, maxDepth, true);
+                }
+
+                posCodeTemp = shiftPosCode(1, posCodeTemp, maxDepth);
+            }
+
+            // Shift posCode back to start in the x direction
+            // Yes this kills me to do but... it's simple and will work
+            for (int j = 0; j <= lenY; j++) {
+                posCodeTemp = shiftPosCode(1, posCodeTemp, maxDepth, true);
+            }
+            posCodeTemp = shiftPosCode(2, posCodeTemp, maxDepth);
+        }
+
+        nodes_bounced = totalSpan - nodes_loaded;
+
+        aout << "[fetchChunks] Loaded in " << nodes_loaded << " chunks; Bounced " <<
+        nodes_bounced << " chunks.\n";
+    }
+
+}
+
+
+void Renderer::initRenderBox() {
+
+    float sY = camera_.distScalarY;
+    float sX = sY * camera_.aspectRatio;
+
+    uint32_t max_cap = RenderBox::MAX_CAPACITY;
+
+    float cx = (sX/octreeData.unitBoxDims.x);
+    float cy = (sY/octreeData.unitBoxDims.y);
+    float cz = (1/octreeData.unitBoxDims.z);
+
+    float camZ = 1.f;
+
+    float calc_cap =
+            (ceil(cx*camZ)+1)*(ceil(cy*camZ)+1)*(ceil(cz*camZ)+1);
+
+    bool done = false;
+
+    while (max_cap > calc_cap) {
+        camZ *= 2;
+
+        calc_cap =
+                (ceil(cx*camZ)+1)*(ceil(cy*camZ)+1)*(ceil(cz*camZ)+1);
+    }
+
+    aout << "Bloated camZ = " << camZ << "\n";
+
+    // Now let's find a happy medium
+    float step = camZ/4;
+
+    while (max_cap < calc_cap) {
+        camZ -= step;
+        step /=2;
+
+        calc_cap =
+                (ceil(cx*camZ)+1)*(ceil(cy*camZ)+1)*(ceil(cz*camZ)+1);
+    }
+
+    aout << "Calculated camZ = " << camZ << "\n";
+
+    camera_.zFar = camZ;
+
+    // Update camera target
+    camera_.target_.z = camera_.pos_.z - (camZ/2);
+    camera_.updateViewMatrix();
+
+    float camY = camZ * camera_.distScalarY;
+    float camX = camY * camera_.aspectRatio;
+
+    float unitZ = octreeData.unitBoxDims.z;
+    float unitY_eqZ = octreeData.unitBoxDims.y / sY;
+    float unitX_eqZ = octreeData.unitBoxDims.x / sX;
+
+    float ratio_x = camX/(float)octreeData.unitBoxDims.x;
+    float ratio_y = camY/(float)octreeData.unitBoxDims.y;
+    float ratio_z = camZ/(float)octreeData.unitBoxDims.z;
+
+    aout << "camX = " << camX << "; camY = " << camY << "; camZ = " << camZ << "\n";
+    aout << "ratio_x = " << ratio_x << "; ratio_y = " << ratio_y << "; ratio_z = " << ratio_z << "\n";
+
+    int rbX = (int)ceil(ratio_x)+1;
+    int rbY = (int)ceil(ratio_y)+1;
+    int rbZ = (int)ceil(ratio_z)+1;
+
+    renderBox.setDims(rbX, rbY, rbZ);
+
+    /*
+    for (int i = 0; i<3; i++) {
+        aout << "renderBox[i] = " << renderBox.bitMasks[i] << "\n";
+    }
+    */
+
+}
+
+
 void Renderer::initCamera() {
     // Initialize the Camera
     glm::vec3 pos = {-15.0f, -15.0f, 8.5f};
@@ -449,96 +788,54 @@ void Renderer::initCamera() {
     this->camera_ = Camera(pos, up);
 
     if (stateVars.hasAspectRatio) {
-        camera_.aspectRatio = float(width_) / float(height_);
+
+        float ar = float(width_) / float(height_);
+        camera_.setAspectRatio(ar);
         camera_.calcDistScalar();
+
+        aout << "[initCamera] aspectRatio = " << camera_.aspectRatio
+             << "; distScalar = " << camera_.distScalarY << "\n";
     }
-}
-
-
-void loadChunk(std::vector<std::vector<cpoint_t>> buffer) {
-
-}
-
-
-void Renderer::fetchChunks() {
-    // Assume renderBoxes is already filled
-
-    // Maybe for now, just use the far plane as the box bounds
-
-    int fHeight = camera_.distScalarY * camera_.zFar;
-    int fWidth = fHeight * camera_.aspectRatio;
-
-    glm::vec3 topRight = {
-            camera_.pos_.x + fWidth/2,
-            camera_.pos_.y + fHeight/2,
-            camera_.pos_.z + camera_.zFar
-    };
-
-
-    glm::vec3 botLeft = {
-            camera_.pos_.x - fWidth/2,
-            camera_.pos_.y - fHeight/2,
-            camera_.pos_.z
-    };
-
-
-    glm::vec3 unitSpans = {
-            fWidth/octreeData.unitBoxDims.x,
-            fHeight/octreeData.unitBoxDims.y,
-            camera_.zFar/octreeData.unitBoxDims.z
-    };
-
-    int maxDepth = octreeData.maxDepth;
-
-
-    // Fetch chunks/nodes based on these two values
-    uint32_t posCode1 = octreeData.root->getPosCode(botLeft, maxDepth);
-    uint32_t posCode2 = octreeData.root->getPosCode(topRight, maxDepth);
-
-
-    uint32_t xCoor = 0, yCoor = 0, zCoor = 0;
-
-    // Set these
-
-    // Subtract position coors, use that result to get the array of desired chunks
-
-    /*
-    for (int i = 0; i<1; i++) {
-        for (int j = 0; j<1; j++) {
-            for (int k = 0; k<1; k++) {
-
-            }
-        }
-    }
-    */
-
-
-
 }
 
 
 void Renderer::initData() {
     aout << "Attempting to read in point cloud data...\n";
 
+    // 1) Open pcd file
     std::string internal_path(app_->activity->internalDataPath);
-    internal_path.append("/pointcloud_100m.pcd");
+    internal_path.append("/pointcloud_50m.pcd");
+    aout << "Internal Data Path = " << internal_path << "\n";
     pcd_file.open(internal_path,std::ios::binary | std::ios::in);
 
-    aout << "Internal Data Path = " << internal_path << "\n";
-
+    // 2) Read in file header and chunk metadata
     FileHeader header;
     pcd_file.read(reinterpret_cast<char*>(&header), sizeof(FileHeader));
+    octreeData.absoluteBounds = {
+            header.bounds.min_x, header.bounds.min_y, header.bounds.min_z,
+            header.bounds.max_x, header.bounds.max_y, header.bounds.max_z
+    };
 
-    octreeData.absoluteBounds = header.bounds;
+    /*
+    aout << "Starting from:\n";
+    aout << "(x, y, z) = (" << octreeData.absoluteBounds.min_x << ", " <<
+         octreeData.absoluteBounds.min_y << ", " <<
+         octreeData.absoluteBounds.min_z << ")\n";
+
+    aout << "Ending at:\n";
+    aout << "(x, y, z) = (" << octreeData.absoluteBounds.max_x << ", " <<
+         octreeData.absoluteBounds.max_y << ", " <<
+         octreeData.absoluteBounds.max_z << ")\n";
+    */
 
     int chunk_count = header.chunk_count;
     aout << "Initializing dataset... there are [" << chunk_count << "] chunks in the data\n";
 
     std::vector<ChunkMetadata> chunkData(chunk_count);
     pcd_file.read(reinterpret_cast<char*>(chunkData.data()), sizeof(ChunkMetadata) * chunk_count);
-
     aout << "Chunk metadata read in... ready to start loading in point cloud data!\n";
 
+    // 3. Build out the Octree structure from the header and chunk metadata
     OctreeNode *root = new OctreeNode(octreeData.absoluteBounds, 0, 0);
     octreeData.root = root;
 
@@ -546,50 +843,44 @@ void Renderer::initData() {
         root->insert(chunkData[i].bbox, octreeData.absoluteBounds);
     }
 
+    // 4. Auxilliary data (maxDepth, unitBox, posCodes, num_points, byte_offset)
     int maxDepth = root->getMaxDepth(root);
     aout << "[INIT DATA] maxDepth = " << maxDepth << "\n";
 
-
     auto numSlices = (float)exp2(maxDepth);
-    glm::vec3 unitBox;
-    unitBox.x = (absoluteBounds.max_x - absoluteBounds.min_x) / numSlices;
-    unitBox.y = (absoluteBounds.max_y - absoluteBounds.min_y) / numSlices;
-    unitBox.z = (absoluteBounds.max_z - absoluteBounds.min_z) / numSlices;
+    glm::vec3 unitBox = {1,1,1};
+    unitBox.x = (octreeData.absoluteBounds.max_x - octreeData.absoluteBounds.min_x) / numSlices;
+    unitBox.y = (octreeData.absoluteBounds.max_y - octreeData.absoluteBounds.min_y) / numSlices;
+    unitBox.z = (octreeData.absoluteBounds.max_z - octreeData.absoluteBounds.min_z) / numSlices;
 
     octreeData.maxDepth = maxDepth;
     octreeData.unitBoxDims = unitBox;
 
+    // Now that the chunks are inserted, let's go back and insert some memory info into them
     root->assignAuxInfo(root, maxDepth);
     root->assignChunkMetadata(chunkData, maxDepth);
 
-
-    // root->printTreeLeaves(root);
-
-/*
-    std::vector<OctreeNode *> nodeArrTest;
-    std::vector<uint32_t> posCodes = {0b011101, 0b011000, 0b001100, 0b000000, 0b111000, 0b111111};
-
-    aout << "[INIT DATA] Printing Nodes...\n";
-
-    for (int i = 0; i<6; i++) {
-        nodeArrTest.push_back(root->getNodeSoft(posCodes[i], maxDepth));
-
-        aout << "[" << i << "] ";
-
-        if (nodeArrTest[i] != nullptr) {
-            nodeArrTest[i]->printNode();
-        } else {
-            aout << "Node is null...\n";
-        }
-    }
-    */
+    aout << "Num Slices = " << numSlices << "\n";
 
 
-    // Now that the chunks are inserted, let's go back and insert some memory info into them
-    aout << "Camera Target:\n";
-    aout << "(x, y, z) = (" << camera_.target_.x << ", " <<
-    camera_.target_.y << ", " << camera_.target_.z << ")\n";
+    aout << "Unit Box Dimensions:\n";
+    aout << "(x, y, z) = (" << unitBox.x << ", " <<
+         unitBox.y << ", " << unitBox.z << ")\n";
 
+
+    // Make sure we have a proper aspect ratio by this point !
+    // Should be taken care of in initCore()
+    initRenderBox();
+    renderBox.initBuffer(header.chunk_size);
+
+    // Fetch chunks
+    fetchChunks();
+
+    // 5) Okay, now we get posCode from the target point, and load in
+    // the corresponding node
+
+    aout << "Camera Target: (x, y, z) = (" << camera_.target_.x << ", " <<
+         camera_.target_.y << ", " << camera_.target_.z << ")\n";
 
     // glm::vec3 target = {-5.0f, -30.0f, -25.0f};
     uint32_t posCode = root->getPosCode(camera_.target_, maxDepth);
@@ -605,23 +896,12 @@ void Renderer::initData() {
      * x -> (-28.30, -2.26)
      * y -> (-17.89, -13.28)
      * z -> (-24.16, 1.61)
-
     */
 
     aout << "[initData] node0->BoundingBox: x = ("
          << bbox0.min_x << ", " << bbox0.max_x
          << "); y = (" << bbox0.min_y << ", " << bbox0.max_y << ")" <<
          "; z = (" << bbox0.min_z << ", " << bbox0.max_z << ")\n";
-
-    /*
-    aout << "[initData] node1->BoundingBox: x = ("
-         << bbox1.min_x << ", " << bbox1.max_x
-         << "); y = (" << bbox1.min_y << ", " << bbox1.max_y << ")" <<
-         "; z = (" << bbox1.min_z << ", " << bbox1.max_z << ")\n";
-    */
-
-
-    // OctreeNode *desiredNode = root->getNode(camera_.target_);
 
     // Load in this node
 
@@ -674,7 +954,7 @@ void Renderer::initData() {
     // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 
-    aout << "sizeof(cpoint_t) = " << (sizeof(cpoint_t)) << "\n";
+    // aout << "sizeof(cpoint_t) = " << (sizeof(cpoint_t)) << "\n";
     aout << "pc_data capacity = " << pc_data.capacity() << "\n";
 
     // For pc_data

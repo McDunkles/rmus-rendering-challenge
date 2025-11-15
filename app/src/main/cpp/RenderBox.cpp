@@ -1,0 +1,54 @@
+//
+// Created by dunca on 2025-11-12.
+//
+
+#include "RenderBox.h"
+#include "AndroidOut.h"
+
+
+void RenderBox::setDims(int x, int y, int z) {
+    bufferDims.x = x;
+    bufferDims.y = y;
+    bufferDims.z = z;
+
+    totalSize = bufferDims.x*bufferDims.y*bufferDims.z;
+
+    aout << "[RenderBox] dimX = " << bufferDims.x << ", dimY = " << bufferDims.y
+    << ", dimZ = " << bufferDims.z << "; totalSize = " << totalSize << "\n";
+
+    pcd_buffer.reserve(totalSize);
+    setBitMasks();
+}
+
+void RenderBox::setBitMasks() {
+
+    int numLayers = 0;
+
+    uint32_t bitMaskTemp = 0;
+
+    for (int i = 0; i<bufferDims.length(); i++) {
+        if (bufferDims[i] > 0) {
+            numLayers = (int)(ceil(log(bufferDims[i])/log(2)));
+        }
+
+        bitMaskTemp = (1 << i);
+
+        for (int j = 0; j<numLayers; j++) {
+            bitMasks[i] |= (bitMaskTemp << (3*j));
+        }
+    }
+
+
+}
+
+void RenderBox::initBuffer(int chunkSize) {
+
+    for (int i = 0; i<totalSize; i++) {
+        pcd_buffer[i].reserve(chunkSize);
+    }
+
+}
+
+void RenderBox::loadChunk(uint32_t posCode, int maxDepth) {
+
+}

@@ -20,6 +20,15 @@ public:
     glm::vec3 unitBoxDims;
     int maxDepth;
 
+    OctreeData() {
+        root = nullptr;
+        absoluteBounds = {0, 0, 0,
+        0, 0, 0};
+
+        unitBoxDims = {1, 1, 1};
+        maxDepth = 0;
+    }
+
 };
 
 

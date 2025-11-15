@@ -15,6 +15,7 @@ add_library(renderingchallenge SHARED
         Octree.cpp
         OctreeData.cpp
         Testbench.cpp
+        RenderBox.cpp
 )
 
 # Searches for a package provided by the game activity dependency
