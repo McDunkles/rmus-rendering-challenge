@@ -276,7 +276,15 @@ void Renderer::render() {
     // glDrawArrays(GL_POINTS, 0, 10);
     // glDrawArrays(GL_LINES, 0, 10);
     // glDrawArrays(GL_LINE_LOOP, 0, 10);
-    glDrawArrays(GL_LINE_STRIP, 0, 10000);
+
+    for (int i = 0; i<renderBox.totalSize; i++) {
+        if (renderBox.active_indices[i]) {
+            glDrawArrays(GL_LINE_STRIP, renderBox.chunk_size * i,
+                         (renderBox.chunk_size * i) + renderBox.num_points_array[i]);
+        }
+    }
+
+    // glDrawArrays(GL_LINE_STRIP, 0, 10000);
     // glDrawArrays(GL_TRIANGLES, 0, 9);
     glBindVertexArray(0);
 
@@ -658,10 +666,17 @@ void Renderer::fetchChunks() {
 
                             int num_points = currNode->numPoints;
 
+                            renderBox.num_points_array[rb_index] = num_points;
+
 
                             // Load the chunk in
                             pcd_file.seekg(currNode->byteOffset, std::ios_base::beg);
-                            pcd_file.read(reinterpret_cast<char*>(renderBox.pcd_buffer[rb_index].data()),
+
+                            char *buffer_loc = reinterpret_cast<char*>(renderBox.pcd_buffer.data()) +
+                                    (renderBox.chunk_size * rb_index);
+                            renderBox.active_indices[rb_index] = true;
+
+                            pcd_file.read(reinterpret_cast<char*>(buffer_loc),
                                             num_points*sizeof(cpoint_t));
 
 
@@ -958,7 +973,9 @@ void Renderer::initData() {
     aout << "pc_data capacity = " << pc_data.capacity() << "\n";
 
     // For pc_data
-    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_DYNAMIC_DRAW);
+    //glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_DYNAMIC_DRAW);
+
+    glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * renderBox.pcd_buffer.capacity()), renderBox.pcd_buffer.data(), GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
     glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(cpoint_t), (void*)(3 * sizeof(float)));
 

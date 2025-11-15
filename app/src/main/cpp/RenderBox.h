@@ -23,6 +23,7 @@ public:
     glm::vec<3, int, glm::defaultp> bufferDims = {0, 0, 0};
 
     int totalSize = 0;
+    int chunk_size = 0;
 
     // uint32_t bitMaskX = 0;
     // uint32_t bitMaskY = 0;
@@ -35,7 +36,10 @@ public:
     // Really this could basically just be an octree structure
     // iPosCode = posCode & bitMask (maybe ?)
     // Keeps a total order, preserves spatial locality
-    std::vector<std::vector<cpoint_t>> pcd_buffer;
+    // std::vector<std::vector<cpoint_t>> pcd_buffer;
+    std::vector<cpoint_t> pcd_buffer;
+    std::vector<bool> active_indices;
+    std::vector<int> num_points_array;
 
     RenderBox() = default;
 

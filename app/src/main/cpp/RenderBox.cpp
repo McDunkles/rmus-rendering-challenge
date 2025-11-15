@@ -16,7 +16,13 @@ void RenderBox::setDims(int x, int y, int z) {
     aout << "[RenderBox] dimX = " << bufferDims.x << ", dimY = " << bufferDims.y
     << ", dimZ = " << bufferDims.z << "; totalSize = " << totalSize << "\n";
 
-    pcd_buffer.reserve(totalSize);
+    active_indices.reserve(totalSize);
+    std::fill(active_indices.begin(), active_indices.end(), false);
+
+    num_points_array.reserve(totalSize);
+    std::fill(num_points_array.begin(), num_points_array.end(), 0);
+
+    // pcd_buffer.reserve(totalSize);
     setBitMasks();
 }
 
@@ -43,9 +49,8 @@ void RenderBox::setBitMasks() {
 
 void RenderBox::initBuffer(int chunkSize) {
 
-    for (int i = 0; i<totalSize; i++) {
-        pcd_buffer[i].reserve(chunkSize);
-    }
+    pcd_buffer.reserve(totalSize * chunkSize);
+    chunk_size = chunkSize;
 
 }
 
