@@ -41,6 +41,13 @@ public:
     std::vector<bool> active_indices;
     std::vector<int> num_points_array;
 
+    glm::vec3 posBL;
+    uint32_t posCodeBL;
+
+    glm::vec3 posTR;
+    uint32_t posCodeTR;
+
+
     RenderBox() = default;
 
     RenderBox(int dim_x, int dim_y, int dim_z) {
@@ -55,7 +62,10 @@ public:
 
     void initBuffer(int chunkSize);
 
-    void loadChunk(uint32_t posCode, int maxDepth);
+    void setPointCorners(glm::vec3 bl, glm::vec3 tr);
+
+    void setPosCodes(uint32_t pc_bl, uint32_t pc_tr);
+
 
 private:
     void setBitMasks();

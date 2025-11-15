@@ -508,6 +508,65 @@ uint32_t shiftPosCode(uint32_t dim, uint32_t posCodeOld, int maxDepth, bool back
     return posCodeNew;
 }
 
+glm::vec3 Renderer::getIndices(uint32_t posCode) {
+
+    // Maybe for now, just use the far plane as the box bounds
+
+    OctreeNode *root = octreeData.root;
+    int maxDepth = octreeData.maxDepth;
+
+    // get x index
+    uint32_t bitMaskX = 0;
+    uint32_t bitMaskY = 0;
+    uint32_t bitMaskZ = 0;
+
+    for (int i = 0; i<maxDepth; i++) {
+        bitMaskX |= (1) << (3*i);
+        bitMaskY |= (1) << (3*i + 1);
+        bitMaskZ |= (1) << (3*i + 2);
+    }
+
+    // aout << "bitMaskX = " << bitMaskX << "\n";
+    // aout << "bitMaskY = " << bitMaskY << "\n";
+    // aout << "bitMaskZ = " << bitMaskZ << "\n";
+
+
+    uint32_t posCodeX = posCode & bitMaskX;
+    uint32_t posCodeY = posCode & bitMaskY;
+    uint32_t posCodeZ = posCode & bitMaskZ;
+
+    // aout << "posCodeTR_Z = " << posCodeTR_Z << "\n";
+
+    uint32_t indexX = 0;
+    uint32_t indexY = 0;
+    uint32_t indexZ = 0;
+
+    uint32_t bitMaskTemp = 0b111;
+    uint32_t temp = 0;
+
+    for (int i = 0; i<maxDepth; i++) {
+        // Bottom Left indices
+        temp = (posCodeX >> (3*i)) & bitMaskTemp;
+        indexX |= (temp << i);
+
+        temp = (posCodeY >> (3*i)) & bitMaskTemp;
+        temp = temp >> 1;
+        indexY |= (temp << i);
+
+        temp = (posCodeZ >> (3*i)) & bitMaskTemp;
+        temp = temp >> 2;
+        indexZ |= (temp << i);
+
+
+    }
+
+    aout << "[getIndices] posCode = " << posCode << "; Indicies:\n x = " << indexX <<
+    "; y = " << indexY << "; z = " << indexZ << "\n";
+
+    glm::vec3 indices = {indexX, indexY, indexZ};
+
+    return indices;
+}
 
 
 void Renderer::fetchChunks() {
@@ -548,83 +607,23 @@ void Renderer::fetchChunks() {
     //      topRightPos.y << ", " << topRightPos.z << ")\n";
     // aout << "posCodeTR = " << posCodeTR << "\n";
 
-    // get x index
-    uint32_t bitMaskX = 0;
-    uint32_t bitMaskY = 0;
-    uint32_t bitMaskZ = 0;
-
-    for (int i = 0; i<maxDepth; i++) {
-        bitMaskX |= (1) << (3*i);
-        bitMaskY |= (1) << (3*i + 1);
-        bitMaskZ |= (1) << (3*i + 2);
-    }
-
-    // aout << "bitMaskX = " << bitMaskX << "\n";
-    // aout << "bitMaskY = " << bitMaskY << "\n";
-    // aout << "bitMaskZ = " << bitMaskZ << "\n";
-
-
-    uint32_t posCodeBL_X = posCodeBL & bitMaskX;
-    uint32_t posCodeBL_Y = posCodeBL & bitMaskY;
-    uint32_t posCodeBL_Z = posCodeBL & bitMaskZ;
-
-    uint32_t posCodeTR_X = posCodeTR & bitMaskX;
-    uint32_t posCodeTR_Y = posCodeTR & bitMaskY;
-    uint32_t posCodeTR_Z = posCodeTR & bitMaskZ;
-
-    // aout << "posCodeTR_Z = " << posCodeTR_Z << "\n";
-
-    uint32_t indexBL_X = 0;
-    uint32_t indexBL_Y = 0;
-    uint32_t indexBL_Z = 0;
-
-    uint32_t indexTR_X = 0;
-    uint32_t indexTR_Y = 0;
-    uint32_t indexTR_Z = 0;
-
-    uint32_t bitMaskTemp = 0b111;
-    uint32_t temp = 0;
-
-    for (int i = 0; i<maxDepth; i++) {
-        // Bottom Left indices
-        temp = (posCodeBL_X >> (3*i)) & bitMaskTemp;
-        indexBL_X |= (temp << i);
-
-        temp = (posCodeBL_Y >> (3*i)) & bitMaskTemp;
-        temp = temp >> 1;
-        indexBL_Y |= (temp << i);
-
-        temp = (posCodeBL_Z >> (3*i)) & bitMaskTemp;
-        temp = temp >> 2;
-        indexBL_Z |= (temp << i);
-
-        // Top Right indices
-        temp = (posCodeTR_X >> (3*i)) & bitMaskTemp;
-        indexTR_X |= (temp << i);
-
-        temp = (posCodeTR_Y >> (3*i)) & bitMaskTemp;
-        temp = temp >> 1;
-        indexTR_Y |= (temp << i);
-
-        temp = (posCodeTR_Z >> (3*i)) & bitMaskTemp;
-        temp = temp >> 2;
-        indexTR_Z |= (temp << i);
-    }
+    glm::vec3 indicesBL = getIndices(posCodeBL);
+    glm::vec3 indicesTR = getIndices(posCodeTR);
 
     // aout << "Bottom Left RenderBox Indicies:\n x = " << indexBL_X <<
     // "; y = " << indexBL_Y << "; z = " << indexBL_Z << "\n";
 
-    aout << "Top Right RenderBox Indicies:\n x = " << indexTR_X <<
-         "; y = " << indexTR_Y << "; z = " << indexTR_Z << "\n";
+    aout << "Top Right RenderBox Indicies:\n x = " << indicesTR.x <<
+         "; y = " << indicesTR.y << "; z = " << indicesTR.z << "\n";
 
     uint32_t startingIndex = posCodeBL;
 
     OctreeNode *nodeBL = root->getNodeSoft(posCodeBL, maxDepth);
 
     // uint32_t bitMaskX
-    int lenX = indexTR_X - indexBL_X;
-    int lenY = indexTR_Y - indexBL_Y;
-    int lenZ = indexTR_Z - indexBL_Z;
+    int lenX = indicesTR.x - indicesBL.x;
+    int lenY = indicesTR.y - indicesBL.y;
+    int lenZ = indicesTR.z - indicesBL.z;
 
     uint32_t posCodeTemp = posCodeBL;
     int rb_index = 0;
@@ -1144,31 +1143,37 @@ void Renderer::handleInput() {
                         camera_.pos_[0]++;
                         aout << "camera.x = " << camera_.pos_[0];
                         updateViewMatrix_ = true;
+                        stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('S'): // 's' key (x--)
                         camera_.pos_[0]--;
                         aout << "camera.x = " << camera_.pos_[0];
                         updateViewMatrix_ = true;
+                        stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('E'): // 'e' key (y++)
                         camera_.pos_[1]++;
                         aout << "camera.y = " << camera_.pos_[1];
                         updateViewMatrix_ = true;
+                        stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('D'): // 'd' key (y--)
                         camera_.pos_[1]--;
                         aout << "camera.y = " << camera_.pos_[1];
                         updateViewMatrix_ = true;
+                        stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('W'): // 'w' key (z++)
                         camera_.pos_[2]++;
                         aout << "camera.z = " << camera_.pos_[2];
                         updateViewMatrix_ = true;
+                        stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('Q'): // 'q' key (z--)
                         camera_.pos_[2]--;
                         aout << "camera.z = " << camera_.pos_[2] << "\n";
                         updateViewMatrix_ = true;
+                        stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('T'):
                         inState.toggleFlag = !inState.toggleFlag;

@@ -85,6 +85,8 @@ private:
 
     void fetchChunks();
 
+    glm::vec3 getIndices(uint32_t posCode);
+
 
     android_app *app_;
     EGLDisplay display_;

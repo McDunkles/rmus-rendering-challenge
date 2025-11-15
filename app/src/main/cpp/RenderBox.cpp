@@ -54,6 +54,14 @@ void RenderBox::initBuffer(int chunkSize) {
 
 }
 
-void RenderBox::loadChunk(uint32_t posCode, int maxDepth) {
 
+void RenderBox::setPointCorners(glm::vec3 bl, glm::vec3 tr) {
+    posBL = bl;
+    posTR = tr;
+}
+
+
+void RenderBox::setPosCodes(uint32_t pc_bl, uint32_t pc_tr) {
+    posCodeBL = pc_bl;
+    posCodeTR = pc_tr;
 }

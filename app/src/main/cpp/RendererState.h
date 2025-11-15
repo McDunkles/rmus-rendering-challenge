@@ -26,6 +26,7 @@ typedef struct InputEventState {
 
 struct RendStateVars {
     bool hasAspectRatio = false;
+    bool cameraMoved = false;
 };
 
 
