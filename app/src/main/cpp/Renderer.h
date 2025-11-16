@@ -83,9 +83,13 @@ private:
 
     void initRenderBox();
 
+    void loadChunk(OctreeNode *chunk);
+
     void fetchChunks();
 
-    glm::vec3 getIndices(uint32_t posCode);
+    void updateChunks();
+
+    glm::vec<3, uint32_t, glm::defaultp> getIndices(uint32_t posCode);
 
 
     android_app *app_;

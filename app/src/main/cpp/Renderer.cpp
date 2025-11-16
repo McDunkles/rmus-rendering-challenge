@@ -253,6 +253,12 @@ void Renderer::render() {
         updateViewMatrix_ = false;
     }
 
+    // Update the rendered chunks if necessary
+    if (stateVars.cameraMoved) {
+        updateChunks();
+        stateVars.cameraMoved = false;
+    }
+
     // clear the color buffer
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -459,9 +465,6 @@ void Renderer::initShaders() {
 }
 
 
-void loadChunk(std::vector<std::vector<cpoint_t>> buffer) {
-
-}
 
 /*
  * dim:
@@ -508,7 +511,29 @@ uint32_t shiftPosCode(uint32_t dim, uint32_t posCodeOld, int maxDepth, bool back
     return posCodeNew;
 }
 
-glm::vec3 Renderer::getIndices(uint32_t posCode) {
+
+uint32_t shiftPosCodeMulti(glm::vec<3, int, glm::defaultp> dim, uint32_t posCodeOld, int maxDepth) {
+
+    uint32_t posCodeNew = posCodeOld;
+
+    int temp = 0;
+    bool backwards = false;
+
+    for (int i = 0; i<dim.length(); i++) {
+        temp = abs(dim[i]);
+        backwards = (dim[i] < 0);
+
+        for (int j = 0; j<temp; j++) {
+            posCodeNew = shiftPosCode(i, posCodeNew, maxDepth, backwards);
+        }
+
+    }
+
+    return posCodeNew;
+}
+
+
+glm::vec<3, uint32_t, glm::defaultp> Renderer::getIndices(uint32_t posCode) {
 
     // Maybe for now, just use the far plane as the box bounds
 
@@ -560,10 +585,10 @@ glm::vec3 Renderer::getIndices(uint32_t posCode) {
 
     }
 
-    aout << "[getIndices] posCode = " << posCode << "; Indicies:\n x = " << indexX <<
-    "; y = " << indexY << "; z = " << indexZ << "\n";
+    // aout << "[getIndices] posCode = " << posCode << "; Indicies:\n x = " << indexX <<
+    // "; y = " << indexY << "; z = " << indexZ << "\n";
 
-    glm::vec3 indices = {indexX, indexY, indexZ};
+    glm::vec<3, uint32_t, glm::defaultp> indices = {indexX, indexY, indexZ};
 
     return indices;
 }
@@ -607,14 +632,21 @@ void Renderer::fetchChunks() {
     //      topRightPos.y << ", " << topRightPos.z << ")\n";
     // aout << "posCodeTR = " << posCodeTR << "\n";
 
-    glm::vec3 indicesBL = getIndices(posCodeBL);
-    glm::vec3 indicesTR = getIndices(posCodeTR);
+    glm::vec<3, uint32_t, glm::defaultp> indicesBL = getIndices(posCodeBL);
+    glm::vec<3, uint32_t, glm::defaultp> indicesTR = getIndices(posCodeTR);
 
     // aout << "Bottom Left RenderBox Indicies:\n x = " << indexBL_X <<
     // "; y = " << indexBL_Y << "; z = " << indexBL_Z << "\n";
 
     aout << "Top Right RenderBox Indicies:\n x = " << indicesTR.x <<
          "; y = " << indicesTR.y << "; z = " << indicesTR.z << "\n";
+
+    // Record indices in the corners, which will be used to for comparison
+    // when updating chunks
+    renderBox.posCodeBL = posCodeBL;
+    renderBox.posCodeTR = posCodeTR;
+    renderBox.indicesBL = {indicesBL.x, indicesBL.y, indicesBL.z};
+    renderBox.indicesTR = {indicesTR.x, indicesTR.y, indicesTR.z};
 
     uint32_t startingIndex = posCodeBL;
 
@@ -645,39 +677,47 @@ void Renderer::fetchChunks() {
 
         int nodes_loaded = 0, nodes_bounced = 0;
 
+        glm::vec<3, uint32_t, glm::defaultp> currIndices = {0, 0, 0};
+        int iX = 0, iY = 0, iZ = 0;
+        int count = 0;
+
         for (int i = 0; i <= lenZ; i++) {
             for (int j = 0; j <= lenY; j++) {
                 for (int k = 0; k <= lenX; k ++) {
-                    rb_index = k + (renderBox.bufferDims.x * j)
-                               + (renderBox.bufferDims.y * renderBox.bufferDims.x * i);
 
                     currNode = root->getNodeSoft(posCodeTemp, maxDepth);
+                    currIndices = getIndices(posCodeTemp);
+
+                    iX = currIndices.x % renderBox.bufferDims.x;
+                    iY = currIndices.y % renderBox.bufferDims.y;
+                    iZ = currIndices.z % renderBox.bufferDims.z;
+
+                    rb_index = iX + (renderBox.bufferDims.x * iY)
+                               + (renderBox.bufferDims.y * renderBox.bufferDims.x * iZ);
 
                     if (currNode != nullptr) {
 
                         if (prevNode == nullptr ||
                         (currNode->encodedPosition != prevNode->encodedPosition)) {
 
-                            if (rb_index >= 18) {
-                                aout << "posCodeTemp = " << posCodeTemp <<
+                            if (count >= 0) {
+                                aout << "rb_index = " << rb_index <<
+                                "; posCodeTemp = " << posCodeTemp <<
                                      "; currNode->encPos = " << currNode->encodedPosition << "\n";
                             }
 
                             int num_points = currNode->numPoints;
 
-                            renderBox.num_points_array[rb_index] = num_points;
-
-
                             // Load the chunk in
-                            pcd_file.seekg(currNode->byteOffset, std::ios_base::beg);
-
                             char *buffer_loc = reinterpret_cast<char*>(renderBox.pcd_buffer.data()) +
                                     (renderBox.chunk_size * rb_index);
-                            renderBox.active_indices[rb_index] = true;
 
+                            pcd_file.seekg(currNode->byteOffset, std::ios_base::beg);
                             pcd_file.read(reinterpret_cast<char*>(buffer_loc),
                                             num_points*sizeof(cpoint_t));
 
+                            renderBox.active_indices[rb_index] = true;
+                            renderBox.num_points_array[rb_index] = num_points;
 
                             nodes_loaded++;
 
@@ -689,6 +729,8 @@ void Renderer::fetchChunks() {
                     prevNode = root->getNodeSoft(posCodeTemp, maxDepth);
 
                     posCodeTemp = shiftPosCode(0, posCodeTemp, maxDepth);
+
+                    count++;
                 }
 
                 // Shift posCode back to start in the x direction
@@ -712,6 +754,165 @@ void Renderer::fetchChunks() {
 
         aout << "[fetchChunks] Loaded in " << nodes_loaded << " chunks; Bounced " <<
         nodes_bounced << " chunks.\n";
+    }
+
+}
+
+
+void Renderer::updateChunks() {
+    OctreeNode *root = octreeData.root;
+    int maxDepth = octreeData.maxDepth;
+
+    float halfHeight = camera_.zFar * camera_.distScalarY;
+    float halfWidth = halfHeight * camera_.aspectRatio;
+
+
+    glm::vec3 botLeftPos = {
+            camera_.pos_.x - halfWidth,
+            camera_.pos_.y - halfHeight,
+            camera_.pos_.z - camera_.zFar
+    };
+
+
+    glm::vec3 topRightPos = {
+            camera_.pos_.x + halfWidth,
+            camera_.pos_.y + halfHeight,
+            camera_.pos_.z
+    };
+
+    uint32_t posCodeBL = root->getPosCode(botLeftPos, maxDepth);
+    uint32_t posCodeTR = root->getPosCode(topRightPos, maxDepth);
+
+    glm::vec<3, uint32_t, glm::defaultp> indicesBL = getIndices(posCodeBL);
+    glm::vec<3, uint32_t, glm::defaultp> indicesTR = getIndices(posCodeTR);
+
+
+    uint32_t startingIndex = posCodeBL;
+
+    OctreeNode *nodeBL = root->getNodeSoft(posCodeBL, maxDepth);
+
+    // uint32_t bitMaskX
+    int lenX = indicesTR.x - indicesBL.x;
+    int lenY = indicesTR.y - indicesBL.y;
+    int lenZ = indicesTR.z - indicesBL.z;
+
+    uint32_t posCodeTemp = posCodeBL;
+    int rb_index = 0;
+
+    int totalSpan = (lenX+1)*(lenY+1)*(lenZ+1);
+
+    if (totalSpan > renderBox.totalSize) {
+        aout << "Problem: Total Size = " << totalSpan << ", but renderBox.totalSize = "
+             << renderBox.totalSize << "\n";
+
+    } else if ( (renderBox.posCodeBL != posCodeBL) || (renderBox.posCodeTR != posCodeTR) ) {
+
+        // Do the loading stuff
+
+        // Find which chunks are now out of scope, remove those
+        // Find which chunks are now in scope, load those in
+
+        OctreeNode *currNode = nullptr, *prevNode = nullptr;
+
+        int nodes_loaded = 0, nodes_bounced = 0;
+
+        glm::vec<3, uint32_t, glm::defaultp> currIndices = {0, 0, 0};
+        int iX = 0, iY = 0, iZ = 0;
+        int count = 0;
+
+        for (int i = 0; i <= lenZ; i++) {
+            for (int j = 0; j <= lenY; j++) {
+                for (int k = 0; k <= lenX; k ++) {
+
+                    currNode = root->getNodeSoft(posCodeTemp, maxDepth);
+                    currIndices = getIndices(posCodeTemp);
+
+                    iX = currIndices.x % renderBox.bufferDims.x;
+                    iY = currIndices.y % renderBox.bufferDims.y;
+                    iZ = currIndices.z % renderBox.bufferDims.z;
+
+                    rb_index = iX + (renderBox.bufferDims.x * iY)
+                               + (renderBox.bufferDims.y * renderBox.bufferDims.x * iZ);
+
+                    // currIndex falls outside of the previous renderBox bounds -> load the chunk in!
+                    if ( ( (renderBox.indicesBL.x > currIndices.x) || (renderBox.indicesTR.x < currIndices.x) ) ||
+                        ( (renderBox.indicesBL.y > currIndices.y) || (renderBox.indicesTR.y < currIndices.y) ) ||
+                        ( (renderBox.indicesBL.z > currIndices.z) || (renderBox.indicesTR.z < currIndices.z) )
+                    ) {
+
+                    aout << "[updateChunks] Indices = (" <<
+                    currIndices.x << ", " << currIndices.y << ", " <<
+                    currIndices.z << ")\n";
+
+                        if (currNode != nullptr) {
+
+                            if (prevNode == nullptr ||
+                                (currNode->encodedPosition != prevNode->encodedPosition)) {
+
+                                if (count >= 0) {
+                                    aout << "[uC] rb_index = " << rb_index <<
+                                         "; posCodeTemp = " << posCodeTemp <<
+                                         "; currNode->encPos = " << currNode->encodedPosition << "\n";
+                                }
+
+                                int num_points = currNode->numPoints;
+
+                                // Load the chunk in
+                                char *buffer_loc = reinterpret_cast<char*>(renderBox.pcd_buffer.data()) +
+                                                   (renderBox.chunk_size * rb_index);
+
+                                pcd_file.seekg(currNode->byteOffset, std::ios_base::beg);
+                                pcd_file.read(reinterpret_cast<char*>(buffer_loc),
+                                              num_points*sizeof(cpoint_t));
+
+                                renderBox.active_indices[rb_index] = true;
+                                renderBox.num_points_array[rb_index] = num_points;
+
+                                nodes_loaded++;
+
+                            }
+
+                        }
+
+                    }
+
+                    // Update prevNode
+                    prevNode = root->getNodeSoft(posCodeTemp, maxDepth);
+
+                    posCodeTemp = shiftPosCode(0, posCodeTemp, maxDepth);
+
+                    count++;
+                }
+
+                // Shift posCode back to start in the x direction
+                // Yes this kills me to do but... it's simple and will work
+                for (int k = 0; k <= lenX; k ++) {
+                    posCodeTemp = shiftPosCode(0, posCodeTemp, maxDepth, true);
+                }
+
+                posCodeTemp = shiftPosCode(1, posCodeTemp, maxDepth);
+            }
+
+            // Shift posCode back to start in the x direction
+            // Yes this kills me to do but... it's simple and will work
+            for (int j = 0; j <= lenY; j++) {
+                posCodeTemp = shiftPosCode(1, posCodeTemp, maxDepth, true);
+            }
+            posCodeTemp = shiftPosCode(2, posCodeTemp, maxDepth);
+        }
+
+        nodes_bounced = totalSpan - nodes_loaded;
+
+        aout << "[updateChunks] Loaded in " << nodes_loaded << " chunks; Bounced " <<
+             nodes_bounced << " chunks.\n";
+
+        // Update renderBox corner indices
+        renderBox.posCodeBL = posCodeBL;
+        renderBox.posCodeTR = posCodeTR;
+        renderBox.indicesBL = {indicesBL.x, indicesBL.y, indicesBL.z};
+        renderBox.indicesTR = {indicesTR.x, indicesTR.y, indicesTR.z};
+    } else {
+        aout << "[uC] No changed needed.\n";
     }
 
 }

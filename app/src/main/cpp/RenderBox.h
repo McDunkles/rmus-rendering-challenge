@@ -31,6 +31,15 @@ public:
 
     glm::vec<3, uint32_t, glm::defaultp> bitMasks = {0, 0, 0};
 
+    uint32_t posCodeBL = 0;
+    uint32_t posCodeTR = 0;
+
+    glm::vec<3, uint32_t, glm::defaultp> indicesBL = {0, 0, 0};
+    glm::vec<3, uint32_t, glm::defaultp> indicesTR = {0, 0, 0};
+
+    glm::vec3 posBL;
+    glm::vec3 posTR;
+
     // Thinking about using an inner posCode
     // Minimum dimensions would be 2x2x2, equivalent to octree of depth 1
     // Really this could basically just be an octree structure
@@ -40,12 +49,6 @@ public:
     std::vector<cpoint_t> pcd_buffer;
     std::vector<bool> active_indices;
     std::vector<int> num_points_array;
-
-    glm::vec3 posBL;
-    uint32_t posCodeBL;
-
-    glm::vec3 posTR;
-    uint32_t posCodeTR;
 
 
     RenderBox() = default;
