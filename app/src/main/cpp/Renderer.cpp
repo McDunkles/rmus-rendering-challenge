@@ -14,7 +14,6 @@
 
 #include "../../../../tools/PointCloudData.h"
 #include "Octree.h"
-#include "Testbench.h"
 
 #include <iostream>
 #include <fstream>
@@ -1152,18 +1151,6 @@ void Renderer::initData() {
             header.bounds.max_x, header.bounds.max_y, header.bounds.max_z
     };
 
-    /*
-    aout << "Starting from:\n";
-    aout << "(x, y, z) = (" << octreeData.absoluteBounds.min_x << ", " <<
-         octreeData.absoluteBounds.min_y << ", " <<
-         octreeData.absoluteBounds.min_z << ")\n";
-
-    aout << "Ending at:\n";
-    aout << "(x, y, z) = (" << octreeData.absoluteBounds.max_x << ", " <<
-         octreeData.absoluteBounds.max_y << ", " <<
-         octreeData.absoluteBounds.max_z << ")\n";
-    */
-
     int chunk_count = header.chunk_count;
     aout << "Initializing dataset... there are [" << chunk_count << "] chunks in the data\n";
 
@@ -1240,7 +1227,6 @@ void Renderer::initData() {
          "; z = (" << bbox0.min_z << ", " << bbox0.max_z << ")\n";
 
     // Load in this node
-
     aout << "Sooooo this OctreeNode here.... octreeNum = " << desiredNode->octantNum
     << "; depth = " << desiredNode->depth << "\n";
 
@@ -1248,28 +1234,6 @@ void Renderer::initData() {
 
     desiredNode->printNode();
 
-    // Finds which index the desired node should be at in memory
-    // root.getSequentialLoc(desiredNode)
-
-    // Buffer to hold the chunks
-    // std::vector<std::vector<cpoint_t>> pc_buffer(30);
-    pc_buffer.reserve(30);
-    for (int i = 0; i<30; i++) {
-        pc_buffer[i].reserve(header.chunk_size);
-    }
-
-
-    int num_points0 = desiredNode->numPoints;
-
-
-    aout << "num_points0 = " << num_points0 << "\n";
-    aout << "offset0 = " << desiredNode->byteOffset << "\n";
-
-    std::vector<cpoint_t> pc_data(num_points0);
-
-    pcd_file.seekg(desiredNode->byteOffset, std::ios_base::beg);
-    pcd_file.read(reinterpret_cast<char*>(pc_data.data()),
-    num_points0*sizeof(cpoint_t));
 
     aout << "We should now have point cloud data\n";
 
@@ -1289,12 +1253,6 @@ void Renderer::initData() {
     // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices3), vertices3, GL_STATIC_DRAW);
     // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    // aout << "sizeof(cpoint_t) = " << (sizeof(cpoint_t)) << "\n";
-    aout << "pc_data capacity = " << pc_data.capacity() << "\n";
-
-    // For pc_data
-    //glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * pc_data.capacity()), pc_data.data(), GL_DYNAMIC_DRAW);
 
     glBufferData(GL_ARRAY_BUFFER, (sizeof(cpoint_t) * renderBox.pcd_buffer.capacity()), renderBox.pcd_buffer.data(), GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cpoint_t), (void*)0);
@@ -1413,7 +1371,7 @@ void Renderer::handleInput() {
                     aout << " ";
                 }
 
-
+                /*
                 if (inState.toggleFlag) {
                     // Update camera position
                     float dx = x - inState.pPos[0];
@@ -1436,6 +1394,7 @@ void Renderer::handleInput() {
                     camera_.camTilt(tiltVector);
                     updateViewMatrix_ = true;
                 }
+                */
 
                 inState.pPos = {x, y};
 
@@ -1455,52 +1414,134 @@ void Renderer::handleInput() {
         aout << "Key: " << keyEvent.keyCode <<" ";
         switch (keyEvent.action) {
             case AKEY_EVENT_ACTION_DOWN:
-                aout << "Key Down";
+                aout << "Key Down\n";
                 break;
             case AKEY_EVENT_ACTION_UP:
-                aout << "Key Up";
+                aout << "Key Up\n";
 
                 switch (keyEvent.keyCode) {
                     case AKeyEvent('F'): // 'f' key (x++)
-                        camera_.pos_[0]++;
-                        aout << "camera.x = " << camera_.pos_[0];
+
+                        if (inState.moveCode & 0b1) {
+                            camera_.target_[0]++;
+                            aout << "target.x = " << camera_.target_[0] << "\n";
+                        }
+
+                        if (inState.moveCode & 0b10) {
+                            camera_.pos_[0]++;
+                            aout << "camera.x = " << camera_.pos_[0] << "\n";
+                        }
+
+                        aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                             ", " << camera_.pos_.z << ")\n";
+                        aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                           ", " << camera_.target_.z << ")\n";
+
                         updateViewMatrix_ = true;
                         stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('S'): // 's' key (x--)
-                        camera_.pos_[0]--;
-                        aout << "camera.x = " << camera_.pos_[0];
+                        if (inState.moveCode & 0b1) {
+                            camera_.target_[0]--;
+                            aout << "target.x = " << camera_.target_[0] << "\n";
+                        }
+
+                        if (inState.moveCode & 0b10) {
+                            camera_.pos_[0]--;
+                            aout << "camera.x = " << camera_.pos_[0] << "\n";
+                        }
+
+                        aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                             ", " << camera_.pos_.z << ")\n";
+                        aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                             ", " << camera_.target_.z << ")\n";
+
                         updateViewMatrix_ = true;
                         stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('E'): // 'e' key (y++)
-                        camera_.pos_[1]++;
-                        aout << "camera.y = " << camera_.pos_[1];
+                        if (inState.moveCode & 0b1) {
+                            camera_.target_[1]++;
+                            aout << "target.y = " << camera_.target_[1] << "\n";
+                        }
+
+                        if (inState.moveCode & 0b10) {
+                            camera_.pos_[1]++;
+                            aout << "camera.y = " << camera_.pos_[1] << "\n";
+                        }
+
+                        aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                             ", " << camera_.pos_.z << ")\n";
+                        aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                             ", " << camera_.target_.z << ")\n";
+
                         updateViewMatrix_ = true;
                         stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('D'): // 'd' key (y--)
-                        camera_.pos_[1]--;
-                        aout << "camera.y = " << camera_.pos_[1];
+
+                        if (inState.moveCode & 0b1) {
+                            camera_.target_[1]--;
+                            aout << "target.y = " << camera_.target_[1] << "\n";
+                        }
+
+                        if (inState.moveCode & 0b10) {
+                            camera_.pos_[1]--;
+                            aout << "camera.y = " << camera_.pos_[1] << "\n";
+                        }
+
+                        aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                             ", " << camera_.pos_.z << ")\n";
+                        aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                             ", " << camera_.target_.z << ")\n";
+
                         updateViewMatrix_ = true;
                         stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('W'): // 'w' key (z++)
-                        camera_.pos_[2]++;
-                        aout << "camera.z = " << camera_.pos_[2];
+
+                        if (inState.moveCode & 0b1) {
+                            camera_.target_[2]++;
+                            aout << "target.z = " << camera_.target_[2] << "\n";
+                        }
+
+                        if (inState.moveCode & 0b10) {
+                            camera_.pos_[2]++;
+                            aout << "camera.z = " << camera_.pos_[2] << "\n";
+                        }
+
+                        aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                             ", " << camera_.pos_.z << ")\n";
+                        aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                             ", " << camera_.target_.z << ")\n";
+
                         updateViewMatrix_ = true;
                         stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('Q'): // 'q' key (z--)
-                        camera_.pos_[2]--;
-                        aout << "camera.z = " << camera_.pos_[2] << "\n";
+
+                        if (inState.moveCode & 0b1) {
+                            camera_.target_[2]--;
+                            aout << "target.z = " << camera_.target_[2] << "\n";
+                        }
+
+                        if (inState.moveCode & 0b10) {
+                            camera_.pos_[2]--;
+                            aout << "camera.z = " << camera_.pos_[2] << "\n";
+                        }
+
+                        aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                             ", " << camera_.pos_.z << ")\n";
+                        aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                             ", " << camera_.target_.z << ")\n";
+
                         updateViewMatrix_ = true;
                         stateVars.cameraMoved = true;
                         break;
                     case AKeyEvent('T'):
-                        inState.toggleFlag = !inState.toggleFlag;
-                        aout << "Toggling Cam Tilt Flag " <<
-                        ((inState.toggleFlag)? "ON" : "OFF" ) << "\n";
+                        inState.moveTarget = !inState.moveTarget;
+                        inState.moveCode = (inState.moveCode % 0b11)+0b1;
+                        aout << "moveCode = " << (int)inState.moveCode << "\n";
                         break;
                     case AKeyEvent('P'):
                         inState.panFlag = !inState.panFlag;

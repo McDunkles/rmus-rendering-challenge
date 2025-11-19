@@ -119,7 +119,6 @@ private:
     std::vector<glm::vec2> renderBoxes;
     OctreeData octreeData;
 
-    std::vector<std::vector<struct Point>> pc_buffer;
     std::ifstream pcd_file;
     std::ifstream pcd_file_dbg;
 

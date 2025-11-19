@@ -14,7 +14,6 @@ add_library(renderingchallenge SHARED
         Camera.cpp
         Octree.cpp
         OctreeData.cpp
-        Testbench.cpp
         RenderBox.cpp
 )
 

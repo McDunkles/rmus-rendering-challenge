@@ -17,9 +17,17 @@ typedef struct InputEventState {
     bool toggleFlag = false;
     bool panFlag = false;
 
+    bool moveTarget = false;
+
+    /*
+     * 0b01 -> Move Camera Position
+     * 0b10 -> Move Target Position
+     * 0b11 -> Move Both Camera and Target Together
+     */
+    uint8_t moveCode = 1;
+
     // Stores the pointer position for touch/move events
     glm::vec2 pPos;
-    int sensitivity = 1;
 
 } InputEventState;
 
