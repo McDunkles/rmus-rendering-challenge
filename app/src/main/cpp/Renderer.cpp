@@ -239,6 +239,113 @@ void Renderer::render() {
 
         // aout << "Updating view matrix!\n";
 
+        if (camera_.pos_ == camera_.target_) {
+
+            aout << "(pos and target can't be equal)\n";
+
+            switch (inState.lastKeyPressed) {
+                case AKeyEvent('S'): // 's' key (x--)
+                    if (inState.moveCode & 0b1) {
+                        camera_.target_[0]--;
+                        aout << "target.x = " << camera_.target_[0] << "\n";
+                    }
+
+                    if (inState.moveCode & 0b10) {
+                        camera_.pos_[0]--;
+                        aout << "camera.x = " << camera_.pos_[0] << "\n";
+                    }
+
+                    aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                         ", " << camera_.pos_.z << ")\n";
+                    aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                         ", " << camera_.target_.z << ")\n";
+
+                    updateViewMatrix_ = true;
+                    stateVars.cameraMoved = true;
+                    break;
+                case AKeyEvent('E'): // 'e' key (y++)
+                    if (inState.moveCode & 0b1) {
+                        camera_.target_[1]++;
+                        aout << "target.y = " << camera_.target_[1] << "\n";
+                    }
+
+                    if (inState.moveCode & 0b10) {
+                        camera_.pos_[1]++;
+                        aout << "camera.y = " << camera_.pos_[1] << "\n";
+                    }
+
+                    aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                         ", " << camera_.pos_.z << ")\n";
+                    aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                         ", " << camera_.target_.z << ")\n";
+
+                    updateViewMatrix_ = true;
+                    stateVars.cameraMoved = true;
+                    break;
+                case AKeyEvent('D'): // 'd' key (y--)
+
+                    if (inState.moveCode & 0b1) {
+                        camera_.target_[1]--;
+                        aout << "target.y = " << camera_.target_[1] << "\n";
+                    }
+
+                    if (inState.moveCode & 0b10) {
+                        camera_.pos_[1]--;
+                        aout << "camera.y = " << camera_.pos_[1] << "\n";
+                    }
+
+                    aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                         ", " << camera_.pos_.z << ")\n";
+                    aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                         ", " << camera_.target_.z << ")\n";
+
+                    updateViewMatrix_ = true;
+                    stateVars.cameraMoved = true;
+                    break;
+
+                case AKeyEvent('W'): // 'w' key (z++)
+
+                    if (inState.moveCode & 0b1) {
+                        camera_.target_[2]++;
+                        aout << "target.z = " << camera_.target_[2] << "\n";
+                    }
+
+                    if (inState.moveCode & 0b10) {
+                        camera_.pos_[2]++;
+                        aout << "camera.z = " << camera_.pos_[2] << "\n";
+                    }
+
+                    aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                         ", " << camera_.pos_.z << ")\n";
+                    aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                         ", " << camera_.target_.z << ")\n";
+
+                    updateViewMatrix_ = true;
+                    stateVars.cameraMoved = true;
+                    break;
+                case AKeyEvent('Q'): // 'q' key (z--)
+
+                    if (inState.moveCode & 0b1) {
+                        camera_.target_[2]--;
+                        aout << "target.z = " << camera_.target_[2] << "\n";
+                    }
+
+                    if (inState.moveCode & 0b10) {
+                        camera_.pos_[2]--;
+                        aout << "camera.z = " << camera_.pos_[2] << "\n";
+                    }
+
+                    aout << "Pos = (" << camera_.pos_.x << ", " << camera_.pos_.y <<
+                         ", " << camera_.pos_.z << ")\n";
+                    aout << "Target = (" << camera_.target_.x << ", " << camera_.target_.y <<
+                         ", " << camera_.target_.z << ")\n";
+
+                    updateViewMatrix_ = true;
+                    stateVars.cameraMoved = true;
+                    break;
+            }
+        }
+
         // Update view matrix
         this->camera_.updateViewMatrix();
         glm::mat4 viewMatrix = this->camera_.viewMatrix_;
@@ -755,6 +862,13 @@ void Renderer::fetchChunks() {
             camera_.pos_.z
     };
 
+    // If the camera is pointing toward the positive x axis, move the render box to the
+    // other side of the z axis relative to the camera
+    if (camera_.pos_.z < camera_.target_.z) {
+        botLeftPos.z += renderBox.cubeSideLength;
+        topRightPos.z += renderBox.cubeSideLength;
+    }
+
 
     aout << "Bottom Left Point: (x, y, z) = (" << botLeftPos.x << ", " <<
          botLeftPos.y << ", " << botLeftPos.z << ")\n";
@@ -1139,7 +1253,7 @@ void Renderer::initData() {
 
     // 1) Open pcd file
     std::string internal_path(app_->activity->internalDataPath);
-    internal_path.append("/pointcloud_50m.pcd");
+    internal_path.append("/pointcloud_10m.pcd");
     aout << "Internal Data Path = " << internal_path << "\n";
     pcd_file.open(internal_path,std::ios::binary | std::ios::in);
 
@@ -1550,6 +1664,8 @@ void Renderer::handleInput() {
                         break;
 
                 }
+
+                inState.lastKeyPressed = keyEvent.keyCode;
 
                 break;
             case AKEY_EVENT_ACTION_MULTIPLE:

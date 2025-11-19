@@ -19,6 +19,8 @@ typedef struct InputEventState {
 
     bool moveTarget = false;
 
+    int32_t lastKeyPressed = 0;
+
     /*
      * 0b01 -> Move Camera Position
      * 0b10 -> Move Target Position
