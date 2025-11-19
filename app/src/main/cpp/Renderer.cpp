@@ -249,6 +249,29 @@ void Renderer::render() {
         GLint viewMatLoc = glGetUniformLocation(shader_program_, "viewMat");
         glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &(viewMatrix[0][0]));
 
+        glm::mat4 vM = camera_.viewMatrix_;
+
+        glm::vec4 vX = vM[0];
+        glm::vec4 vY = vM[1];
+        glm::vec4 vZ = vM[2];
+        glm::vec4 vO = vM[3];
+
+        // float alpha2 = acos(glm::dot(vX, {1, 0, 0, 0}));
+        // float beta2 = acos(glm::dot(vY, {0, 1, 0, 0}));
+        // float gamma2 = acos(glm::dot(vZ, {0, 0, 1, 0}));
+
+        float vXx2 = pow(vX[0], 2);
+        float vXy2 = pow(vX[1], 2);
+
+        float beta = atan2(-vX[2], sqrt(vXx2 + vXy2));
+        float alpha = atan2(vY[2]/cos(beta), vZ[2]/cos(beta));
+        float gamma = atan2(vX[1]/cos(beta), vX[0]/cos(beta));
+
+        aout << "vX = (" << vX[0] << ", " << vX[1] << ", " << vX[2] << ", " << vX[3] << ")\n";
+        aout << "vY = (" << vY[0] << ", " << vY[1] << ", " << vY[2] << ", " << vY[3] << ")\n";
+        aout << "vZ = (" << vZ[0] << ", " << vZ[1] << ", " << vZ[2] << ", " << vZ[3] << ")\n";
+        aout << "Euler Angles = (" << alpha << ", " << beta << ", " << gamma << ")\n";
+
 
         updateViewMatrix_ = false;
     }
@@ -581,8 +604,6 @@ glm::vec<3, uint32_t, glm::defaultp> Renderer::getIndices(uint32_t posCode) {
         temp = (posCodeZ >> (3*i)) & bitMaskTemp;
         temp = temp >> 2;
         indexZ |= (temp << i);
-
-
     }
 
     // aout << "[getIndices] posCode = " << posCode << "; Indicies:\n x = " << indexX <<
@@ -593,6 +614,108 @@ glm::vec<3, uint32_t, glm::defaultp> Renderer::getIndices(uint32_t posCode) {
     return indices;
 }
 
+glm::vec3 Renderer::getIndicesFloat(glm::vec3 point) {
+
+    BoundingBox aB = octreeData.absoluteBounds;
+    glm::vec3 minPoint = {aB.min_x, aB.min_y, aB.min_z};
+    glm::vec3 unitBox = octreeData.unitBoxDims;
+
+    glm::vec3 indices = {
+            (point.x - minPoint.x)/unitBox.x,
+            (point.y - minPoint.y)/unitBox.y,
+            (point.z - minPoint.z)/unitBox.z
+    };
+
+    return indices;
+}
+
+
+void Renderer::fetchChunks2() {
+
+    OctreeNode *root = octreeData.root;
+    int maxDepth = octreeData.maxDepth;
+
+    float halfHeight = camera_.zFar * camera_.distScalarY;
+    float halfWidth = halfHeight * camera_.aspectRatio;
+
+    // Let's get the 8 corners
+    // 0 BLN, 1 BRN, 2 TLN, 3 TRN, 4 BLF, 5 BRF, 6 TLF, 7 TRF
+    std::vector<glm::vec3> corners(8);
+    for (int i = 0; i<8; i++) {
+        corners[i].x = camera_.pos_.x + halfWidth*pow(-1, i);
+        corners[i].y = camera_.pos_.y + halfHeight*(((i % 4) < 2)? -1 : 1);
+        corners[i].z = camera_.pos_.z - ((i < 4)? camera_.zFar : 0);
+    }
+
+    /*
+    glm::vec3 botLeftNear = {
+            camera_.pos_.x - halfWidth,
+            camera_.pos_.y - halfHeight,
+            camera_.pos_.z - camera_.zFar
+    };
+
+    glm::vec3 botRightNear = {
+            camera_.pos_.x + halfWidth,
+            camera_.pos_.y - halfHeight,
+            camera_.pos_.z - camera_.zFar
+    };
+
+    glm::vec3 topLeftNear = {
+            camera_.pos_.x - halfWidth,
+            camera_.pos_.y + halfHeight,
+            camera_.pos_.z - camera_.zFar
+    };
+
+    glm::vec3 topRightNear = {
+            camera_.pos_.x + halfWidth,
+            camera_.pos_.y + halfHeight,
+            camera_.pos_.z - camera_.zFar
+    };
+
+
+    glm::vec3 botLeftFar = {
+            camera_.pos_.x - halfWidth,
+            camera_.pos_.y - halfHeight,
+            camera_.pos_.z
+    };
+
+    glm::vec3 botRightFar = {
+            camera_.pos_.x + halfWidth,
+            camera_.pos_.y - halfHeight,
+            camera_.pos_.z
+    };
+
+    glm::vec3 topLeftFar = {
+            camera_.pos_.x - halfWidth,
+            camera_.pos_.y + halfHeight,
+            camera_.pos_.z
+    };
+
+    glm::vec3 topRightFar = {
+            camera_.pos_.x + halfWidth,
+            camera_.pos_.y + halfHeight,
+            camera_.pos_.z
+    };
+    */
+
+
+    /*
+    // These are described in local space, which must be converted to camera
+    // space before performing any operations
+    glm::vec3 sideX = botRightNear - botLeftNear;
+    glm::vec3 sideY = topLeftNear - botLeftNear;
+    glm::vec3 sideZ = botLeftFar - botRightFar;
+
+    glm::mat4 vM = glm::transpose(camera_.viewMatrix_);
+
+
+    aout << "Bottom Left Point: (x, y, z) = (" << botLeftNear.x << ", " <<
+         botLeftNear.y << ", " << botLeftNear.z << ")\n";
+
+    uint32_t posCodeBL = root->getPosCode(botLeftNear, maxDepth);
+    aout << "posCodeBL = " << posCodeBL << "\n";
+    */
+}
 
 void Renderer::fetchChunks() {
     // Assume renderBoxes is already filled
@@ -606,6 +729,7 @@ void Renderer::fetchChunks() {
     float halfWidth = halfHeight * camera_.aspectRatio;
 
 
+    /*
     glm::vec3 botLeftPos = {
             camera_.pos_.x - halfWidth,
             camera_.pos_.y - halfHeight,
@@ -616,6 +740,19 @@ void Renderer::fetchChunks() {
     glm::vec3 topRightPos = {
             camera_.pos_.x + halfWidth,
             camera_.pos_.y + halfHeight,
+            camera_.pos_.z
+    };
+    */
+
+    glm::vec3 botLeftPos = {
+            camera_.pos_.x - renderBox.cubeSideLength/2,
+            camera_.pos_.y - renderBox.cubeSideLength/2,
+            camera_.pos_.z - renderBox.cubeSideLength
+    };
+
+    glm::vec3 topRightPos = {
+            camera_.pos_.x + renderBox.cubeSideLength/2,
+            camera_.pos_.y + renderBox.cubeSideLength/2,
             camera_.pos_.z
     };
 
@@ -700,11 +837,13 @@ void Renderer::fetchChunks() {
                         if (prevNode == nullptr ||
                         (currNode->encodedPosition != prevNode->encodedPosition)) {
 
+                            /*
                             if (count >= 0) {
                                 aout << "rb_index = " << rb_index <<
                                 "; posCodeTemp = " << posCodeTemp <<
                                      "; currNode->encPos = " << currNode->encodedPosition << "\n";
                             }
+                            */
 
                             int num_points = currNode->numPoints;
 
@@ -768,15 +907,14 @@ void Renderer::updateChunks() {
 
 
     glm::vec3 botLeftPos = {
-            camera_.pos_.x - halfWidth,
-            camera_.pos_.y - halfHeight,
-            camera_.pos_.z - camera_.zFar
+            camera_.pos_.x - renderBox.cubeSideLength/2,
+            camera_.pos_.y - renderBox.cubeSideLength/2,
+            camera_.pos_.z - renderBox.cubeSideLength
     };
 
-
     glm::vec3 topRightPos = {
-            camera_.pos_.x + halfWidth,
-            camera_.pos_.y + halfHeight,
+            camera_.pos_.x + renderBox.cubeSideLength/2,
+            camera_.pos_.y + renderBox.cubeSideLength/2,
             camera_.pos_.z
     };
 
@@ -914,7 +1052,6 @@ void Renderer::updateChunks() {
     } else {
         aout << "[uC] No changed needed.\n";
     }
-
 }
 
 
@@ -967,29 +1104,13 @@ void Renderer::initRenderBox() {
     float camY = camZ * camera_.distScalarY;
     float camX = camY * camera_.aspectRatio;
 
-    float unitZ = octreeData.unitBoxDims.z;
-    float unitY_eqZ = octreeData.unitBoxDims.y / sY;
-    float unitX_eqZ = octreeData.unitBoxDims.x / sX;
-
-    float ratio_x = camX/(float)octreeData.unitBoxDims.x;
-    float ratio_y = camY/(float)octreeData.unitBoxDims.y;
-    float ratio_z = camZ/(float)octreeData.unitBoxDims.z;
+    float CTC_len = sqrt(pow(camX, 2) + pow(camY, 2) + pow(camZ, 2));
 
     aout << "camX = " << camX << "; camY = " << camY << "; camZ = " << camZ << "\n";
-    aout << "ratio_x = " << ratio_x << "; ratio_y = " << ratio_y << "; ratio_z = " << ratio_z << "\n";
+    // aout << "ratio_x2 = " << ratio_x2 << "; ratio_y2 = " << ratio_y2 << "; ratio_z2 = " << ratio_z2 << "\n";
+    // aout << "Total Cube Size = " << totalCubeSize << "\n";
 
-    int rbX = (int)ceil(ratio_x)+1;
-    int rbY = (int)ceil(ratio_y)+1;
-    int rbZ = (int)ceil(ratio_z)+1;
-
-    renderBox.setDims(rbX, rbY, rbZ);
-
-    /*
-    for (int i = 0; i<3; i++) {
-        aout << "renderBox[i] = " << renderBox.bitMasks[i] << "\n";
-    }
-    */
-
+    renderBox.setDims(camX, camY, camZ, octreeData.unitBoxDims);
 }
 
 

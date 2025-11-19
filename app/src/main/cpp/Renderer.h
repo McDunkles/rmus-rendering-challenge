@@ -89,7 +89,11 @@ private:
 
     void updateChunks();
 
+    void fetchChunks2();
+
     glm::vec<3, uint32_t, glm::defaultp> getIndices(uint32_t posCode);
+
+    glm::vec3 getIndicesFloat(glm::vec3 point);
 
 
     android_app *app_;

@@ -21,9 +21,11 @@ public:
     // int dimX, dimY, dimZ;
 
     glm::vec<3, int, glm::defaultp> bufferDims = {0, 0, 0};
+    float cubeSideLength;
 
     int totalSize = 0;
     int chunk_size = 0;
+    int totalCubeSize = 0;
 
     // uint32_t bitMaskX = 0;
     // uint32_t bitMaskY = 0;
@@ -61,7 +63,7 @@ public:
         totalSize = dim_x*dim_y*dim_z;
     }
 
-    void setDims(int x, int y, int z);
+    void setDims(float camX, float camY, float camZ, glm::vec3 unitBox);
 
     void initBuffer(int chunkSize);
 
